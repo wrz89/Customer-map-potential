@@ -125,7 +125,8 @@ Gli acquisti restano nel registro del dealer, così la stessa zona non si ricomp
 1. Su registroimprese.it, **Elenchi di imprese**: filtra per provincia e attività **45.20.40**, solo imprese attive.
 2. Scegli il formato **Indirizzi**. Il prezzo appare prima dell'acquisto.
 3. Scarica il CSV e caricalo in **Territorio → Concorrenza → Importa elenco Telemaco** (per i gommisti) oppure in **Aziende → Importa elenco Telemaco** (per i clienti potenziali).
-4. Il file deve avere almeno **Ragione Sociale** e **Comune**; il programma riconosce da solo Partita IVA, Indirizzo, CAP, Provincia, ATECO, Addetti, Fatturato, PEC. Se ci sono colonne **Lat** e **Lon** le usa come posizione esatta.
+   Per raggi piccoli conviene selezionare per **CAP** (o comune) invece che per provincia: si pagano solo le imprese vicine al dealer.
+4. Il file deve avere **Ragione Sociale** (o Denominazione) e **Comune**, oppure un Indirizzo che finisca con CAP e comune. Legge CSV (anche in formato Excel italiano, con ; e accenti) e .xlsx; i vecchi .xls vanno salvati come .xlsx. Riconosce da solo Partita IVA, Indirizzo, CAP, Provincia, ATECO, Addetti, Fatturato, PEC. Se ci sono colonne **Lat** e **Lon** le usa come posizione esatta.
 5. Posizione: gli elenchi Telemaco non hanno coordinate, quindi all'inizio ogni impresa sta al centro del suo comune. Con un **raggio fino a 3 km** il programma cerca da solo l'indirizzo esatto delle imprese dei comuni nella zona, circa una al secondo, e le sposta; le altre restano fuori. Con raggi maggiori il centro del comune basta e non si cerca nulla. Compaiono in mappa man mano che vengono trovate.
 
 ## Da sapere sui dati

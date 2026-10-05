@@ -16,6 +16,15 @@ function testoCella(v: ExcelJS.CellValue): string {
   return String(v).trim()
 }
 
+/** I CSV di Windows/Excel italiani sono spesso in Windows-1252, non UTF-8: senza questo gli accenti diventano "�". */
+export function decodificaCsv(byte: ArrayBuffer): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(byte).replace(/^\uFEFF/, '')
+  } catch {
+    return new TextDecoder('windows-1252').decode(byte)
+  }
+}
+
 function parseCsv(text: string): string[][] {
   const prima = text.split(/\r?\n/, 1)[0]
   const sep = [';', '\t', ','].sort((a, b) => prima.split(b).length - prima.split(a).length)[0]
@@ -47,7 +56,7 @@ function parseCsv(text: string): string[][] {
 export async function leggiTabella(file: File, foglioPreferito?: string): Promise<{ intestazioni: string[]; righe: Righe }> {
   let matrice: string[][]
   if (/\.(csv|txt)$/i.test(file.name)) {
-    matrice = parseCsv(await file.text())
+    matrice = parseCsv(decodificaCsv(await file.arrayBuffer()))
   } else if (/\.xlsx$|\.xlsm$/i.test(file.name)) {
     const { default: Excel } = await import('exceljs')
     const wb = new Excel.Workbook()
@@ -67,7 +76,14 @@ export async function leggiTabella(file: File, foglioPreferito?: string): Promis
   }
   const h = matrice.findIndex((r) => r.filter(Boolean).length >= 2)
   if (h < 0) return { intestazioni: [], righe: [] }
-  const intestazioni = matrice[h].map((x, i) => x || `Colonna ${i + 1}`)
+  // titoli vuoti o ripetuti: si distinguono, altrimenti una colonna ne cancella un'altra
+  const visti = new Map<string, number>()
+  const intestazioni = matrice[h].map((x, i) => {
+    const base = x || `Colonna ${i + 1}`
+    const n = (visti.get(base) ?? 0) + 1
+    visti.set(base, n)
+    return n > 1 ? `${base} (${n})` : base
+  })
   const righe = matrice.slice(h + 1).map((r) => Object.fromEntries(intestazioni.map((k, i) => [k, r[i] ?? ''])))
   return { intestazioni, righe: righe.filter((r) => Object.values(r).some(Boolean)) }
 }
@@ -77,7 +93,7 @@ const SINONIMI: Record<string, RegExp> = {
   piva: /(p\.?\s*iva|partita\s*iva|piva|vat|codice\s*fiscale|cod\.?\s*fisc|^cf$)/i,
   indirizzo: /(indirizzo|^via$|address|sede)/i,
   comune: /(comune|citt[aà]|localit[aà]|town|city)/i,
-  cap: /^cap$/i,
+  cap: /^c\.?a\.?p\.?$|codice\s*postale/i,
   provincia: /(^prov|provincia|^pr$)/i,
   ateco: /(ateco|attivit[aà]\s*(prevalente)?\s*cod|codice\s*attivit)/i,
   dipendenti: /(addetti|dipendenti|employees)/i,

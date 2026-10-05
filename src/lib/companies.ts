@@ -234,14 +234,17 @@ export function generaDemo(zona: Zona, minDipendenti = 10): Azienda[] {
 export async function importaElenco(file: File, zona: Zona): Promise<Azienda[]> {
   const { intestazioni, righe } = await leggiTabella(file)
   const m = indovinaColonne(intestazioni)
-  if (!m.ragioneSociale) throw new Error(`Non trovo la colonna con la ragione sociale. Colonne lette: ${intestazioni.join(', ')}`)
+  if (!m.ragioneSociale) throw new Error(`Non trovo la colonna con la ragione sociale (Ragione Sociale o Denominazione). Colonne lette: ${intestazioni.join(', ')}`)
+  if (!m.comune && !m.indirizzo) throw new Error(`Servono la colonna Comune oppure Indirizzo con CAP e comune. Colonne lette: ${intestazioni.join(', ')}`)
   const indice = indiceComuni(zona.comuni.map((z) => z.comune))
   const colLat = intestazioni.find((h) => /^lat/i.test(h.trim()))
   const colLon = intestazioni.find((h) => /^(lon|lng)/i.test(h.trim()))
   return righe
     .filter((r) => r[m.ragioneSociale!])
     .map((r, i) => {
-      const comune = m.comune ? r[m.comune] : ''
+      // senza colonna Comune si prova dall'indirizzo: "Via Roma 1, 27100 Pavia (PV)"
+      const daIndirizzo = m.indirizzo ? r[m.indirizzo].match(/(\d{5})\s+([A-Za-zÀ-ÿ'’. -]{2,}?)\s*(?:\(([A-Za-z]{2})\))?\s*$/) : null
+      const comune = m.comune ? r[m.comune] : (daIndirizzo?.[2]?.trim() ?? '')
       const c = comune ? trovaComune({ citta: comune, provincia: m.provincia ? r[m.provincia] : '' }, indice) : null
       // coordinate nel file: posizione esatta; altrimenti centro del comune, da affinare dopo
       const latF = colLat ? numero(r[colLat]) : null
@@ -259,9 +262,9 @@ export async function importaElenco(file: File, zona: Zona): Promise<Azienda[]> 
           annoBilancio: null,
           formaGiuridica: '',
           indirizzo: m.indirizzo ? r[m.indirizzo] : '',
-          cap: m.cap ? r[m.cap] : '',
+          cap: m.cap ? r[m.cap] : (daIndirizzo?.[1] ?? ''),
           comune,
-          provincia: m.provincia ? r[m.provincia] : (c?.p ?? ''),
+          provincia: m.provincia ? r[m.provincia] : (c?.p ?? daIndirizzo?.[3]?.toUpperCase() ?? ''),
           pec: m.pec ? r[m.pec] : '',
           lat: esatta ? latF : (c?.lat ?? null),
           lon: esatta ? lonF : (c?.lon ?? null),
