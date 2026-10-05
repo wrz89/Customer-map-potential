@@ -490,6 +490,7 @@ export default function MapView(props: Props) {
             `<div class="cmp-card"><div class="t">${esc(a.ragioneSociale)}</div>
             <div class="s">${esc(a.categoria)}${a.ateco ? ` · ATECO ${esc(a.ateco)}` : ''}</div>
             ${a.fonte === 'demo' ? '<div class="demo">Dato dimostrativo</div>' : ''}
+            ${a.fonte === 'osm' ? `<div class="m">${esc(a.atecoDescr)} · da OpenStreetMap, senza dati su addetti e fatturato</div>${a.contatto ? `<div class="s">${esc(a.contatto)}</div>` : ''}` : ''}
             <table>
               <tr><td>Dipendenti</td><td>${a.dipendenti ? n0(a.dipendenti) : 'n.d.'}</td></tr>
               <tr><td>Fatturato</td><td>${a.fatturato ? `${n0(a.fatturato / 1000)} k€` : 'n.d.'}</td></tr>

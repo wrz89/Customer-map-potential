@@ -23,11 +23,11 @@ import { Impostazioni } from './components/Impostazioni'
 import MapView, { type Centro, type Metrica } from './components/MapView'
 import Settori from './components/Settori'
 import Territorio from './components/Territorio'
-import { Avviso, Kpi } from './components/ui'
+import { Avviso, Kpi, KpiRiga } from './components/ui'
 import type { Azienda } from './lib/companies'
 import { DEMO, salvaFile } from './lib/ambiente'
 import { generaDemo, inComune } from './lib/companies'
-import { caricaConcorrenzaOsm, daRegistro, unisciConcorrenti } from './lib/concorrenza'
+import { areaCopre, caricaConcorrenzaOsm, daRegistro, filtraConcorrenti, unisciConcorrenti, type AreaOsm } from './lib/concorrenza'
 import { loadComuni, loadMeta, type Meta } from './lib/data'
 import { quotaVecchie } from './lib/eta'
 import { compatto, n0, pct } from './lib/fmt'
@@ -75,7 +75,7 @@ function temaIniziale(): 'light' | 'dark' {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-const PRIORITA_FONTE: Record<Azienda['fonte'], number> = { openapi: 3, import: 2, demo: 1 }
+const PRIORITA_FONTE: Record<Azienda['fonte'], number> = { openapi: 4, import: 3, demo: 2, osm: 1 }
 
 export default function App() {
   const [dealer, setDealer] = useState<Dealer[]>(caricaDealer)
@@ -150,23 +150,40 @@ export default function App() {
     if (selId) ricaricaDati(selId)
   }, [selId, ricaricaDati])
 
-  // concorrenza: OpenStreetMap (gratis, parziale) + gommisti del Registro Imprese acquistati o importati
-  const [osm, setOsm] = useState<{ chiave: string; stato: 'carico' | 'ok' | 'errore' | 'assente'; concorrenti: Concorrente[]; data?: string; errore?: string } | null>(null)
-  const chiaveZona = zona ? `${zona.centro.lat},${zona.centro.lon},${zona.raggioKm}` : ''
-  const caricaOsm = useCallback(
-    (z: Zona, forza = false) => {
-      const k = `${z.centro.lat},${z.centro.lon},${z.raggioKm}`
-      if (DEMO) return setOsm({ chiave: k, stato: 'assente', concorrenti: [] })
-      setOsm({ chiave: k, stato: 'carico', concorrenti: [] })
-      caricaConcorrenzaOsm(z.centro.lat, z.centro.lon, z.raggioKm, forza)
-        .then((r) => setOsm((x) => (x?.chiave === k ? { chiave: k, stato: 'ok', concorrenti: r.concorrenti, data: r.data } : x)))
-        .catch((e) => setOsm((x) => (x?.chiave === k ? { chiave: k, stato: 'errore', concorrenti: [], errore: (e as Error).message } : x)))
-    },
-    [],
-  )
+  // concorrenza: OpenStreetMap (gratis, parziale) + gommisti del Registro Imprese acquistati o importati.
+  // Si carica un'area più larga della zona e si tiene sempre l'ultimo elenco buono: se il centro si sposta di poco,
+  // o la richiesta è lenta o fallisce, i gommisti non spariscono.
+  const [osm, setOsm] = useState<{ stato: 'carico' | 'ok' | 'errore' | 'assente'; area?: AreaOsm; tutti: Concorrente[]; data?: string; errore?: string }>({ stato: 'carico', tutti: [] })
+  const richiestaOsm = useRef(0)
+  const caricandoOsm = useRef(false)
+  const tentativoFallito = useRef('')
+  const chiaveOsm = (z: Zona) => `${z.centro.lat.toFixed(3)},${z.centro.lon.toFixed(3)},${z.raggioKm}`
+  const caricaOsm = useCallback((z: Zona, forza = false) => {
+    if (DEMO) return setOsm({ stato: 'assente', tutti: [] })
+    const id = ++richiestaOsm.current
+    const k = chiaveOsm(z)
+    caricandoOsm.current = true
+    if (forza) tentativoFallito.current = ''
+    setOsm((x) => ({ ...x, stato: 'carico', errore: undefined }))
+    caricaConcorrenzaOsm(z.centro.lat, z.centro.lon, z.raggioKm, forza)
+      .then((r) => {
+        if (id !== richiestaOsm.current) return
+        caricandoOsm.current = false
+        setOsm({ stato: 'ok', area: r.area, tutti: r.concorrenti, data: r.data })
+      })
+      .catch((e) => {
+        if (id !== richiestaOsm.current) return
+        caricandoOsm.current = false
+        tentativoFallito.current = k
+        setOsm((x) => ({ ...x, stato: 'errore', errore: (e as Error).message }))
+      })
+  }, [])
+  const osmCopreZona = !!zona && !!osm.area && areaCopre(osm.area, zona.centro.lat, zona.centro.lon, zona.raggioKm)
   useEffect(() => {
-    if (zona && osm?.chiave !== chiaveZona) caricaOsm(zona)
-  }, [zona, chiaveZona, osm?.chiave, caricaOsm])
+    // si carica solo se l'area già in mano non copre la zona; dopo un errore si riprova cambiando zona o col pulsante Aggiorna
+    if (!zona || osmCopreZona || caricandoOsm.current || tentativoFallito.current === chiaveOsm(zona)) return
+    caricaOsm(zona)
+  }, [zona, osmCopreZona, osm.stato, caricaOsm])
 
   // il comune di un'impresa è nella zona? (elenchi importati senza coordinate esatte)
   const indiceZona = useMemo(() => (zona ? indiceComuni(zona.comuni.map((z) => z.comune)) : null), [zona])
@@ -181,20 +198,20 @@ export default function App() {
 
   const zonaVista = useMemo<Zona | null>(() => {
     if (!zona) return null
-    const osmOk = osm?.chiave === chiaveZona ? osm : null
-    const conc = unisciConcorrenti(registro, osmOk?.concorrenti ?? [])
+    const osmZona = filtraConcorrenti(osm.tutti, zona.centro.lat, zona.centro.lon, zona.raggioKm)
+    const conc = unisciConcorrenti(registro, osmZona)
     return {
       ...zona,
       concorrenti: conc,
       infoConcorrenza: {
-        stato: osmOk?.stato ?? 'carico',
-        data: osmOk?.data,
-        errore: osmOk?.errore,
+        stato: osm.stato,
+        data: osm.data,
+        errore: osm.errore,
         osm: conc.filter((c) => c.fonte === 'osm').length,
         registro: registro.length,
       },
     }
-  }, [zona, osm, chiaveZona, registro])
+  }, [zona, osm, registro])
 
   // demo: al primo calcolo di un dealer si generano le aziende dimostrative, così la mappa è subito piena
   const demoFatti = useRef(new Set<string>())
@@ -327,7 +344,8 @@ export default function App() {
     const out = new Map<string, EsitoMatch>()
     if (!lista) return out
     const idx = preparaClienti(lista.clienti)
-    for (const a of aziende) out.set(a.id, confronta({ id: a.id, ragioneSociale: a.ragioneSociale, piva: a.piva, indirizzo: a.indirizzo, comune: a.comune }, idx))
+    const rapido = aziende.length > 3000
+    for (const a of aziende) out.set(a.id, confronta({ id: a.id, ragioneSociale: a.ragioneSociale, piva: a.piva, indirizzo: a.indirizzo, comune: a.comune }, idx, rapido))
     return out
   }, [aziende, lista])
 
@@ -358,50 +376,51 @@ export default function App() {
   return (
     <div className="flex h-full flex-col lg:flex-row">
       {/* ---------- barra laterale ---------- */}
-      <aside className="flex shrink-0 flex-col border-b lg:h-full lg:w-[300px] lg:border-r lg:border-b-0" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
-        <div className="flex items-center gap-3 px-4 py-4">
-          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-9 w-9" />
-          <div>
-            <div className="text-[15px] font-bold leading-tight">Customer Map Potential</div>
-            <div className="text-xs" style={{ color: 'var(--muted)' }}>Rete SuperService · uso interno</div>
+      <aside className="flex shrink-0 flex-col border-b lg:h-full lg:w-[228px] lg:border-r lg:border-b-0" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
+        <div className="flex items-center gap-2 px-3 py-3">
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-7 w-7" />
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-bold leading-tight">Customer Map Potential</div>
+            <div className="text-[10.5px]" style={{ color: 'var(--muted)' }}>Rete SuperService</div>
           </div>
         </div>
-        <div className="px-4">
+        <div className="px-3">
           <div className="flex items-center justify-between">
-            <div className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted)' }}>Dealer ({dealer.length})</div>
-            <button className="btn !px-2 !py-1 text-xs" onClick={() => setModale('nuovo')}>
-              <Plus size={14} /> Nuovo
+            <div className="text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: 'var(--muted)' }}>Dealer ({dealer.length})</div>
+            <button className="btn !gap-1 !px-1.5 !py-0.5 text-[11px]" onClick={() => setModale('nuovo')}>
+              <Plus size={12} /> Nuovo
             </button>
           </div>
           {daAffinare.length > 0 && !DEMO && (
-            <div className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }} title="Il servizio gratuito di ricerca indirizzi accetta una richiesta al secondo">
-              Cerco la via esatta: ne mancano {daAffinare.length}, circa {Math.max(1, Math.ceil((daAffinare.length * 2) / 60))} min. Intanto i dealer sono al centro del comune.
+            <div className="mt-1.5 text-[10.5px] leading-snug" style={{ color: 'var(--muted)' }} title="Il servizio gratuito di ricerca indirizzi accetta una richiesta al secondo">
+              Cerco la via esatta: ne mancano {daAffinare.length}, circa {Math.max(1, Math.ceil((daAffinare.length * 2) / 60))} min.
             </div>
           )}
-          {dealer.length > 6 && <input className="input mt-2" placeholder="Cerca dealer" value={cercaDealer} onChange={(e) => setCercaDealer(e.target.value)} />}
+          {dealer.length > 6 && <input className="input mt-2 !py-1 text-xs" placeholder="Cerca dealer" value={cercaDealer} onChange={(e) => setCercaDealer(e.target.value)} />}
         </div>
-        <nav className="mt-2 max-h-48 flex-1 space-y-1 overflow-auto px-3 pb-3 lg:max-h-none">
+        <nav className="mt-1.5 max-h-48 flex-1 space-y-px overflow-auto px-2 pb-2 lg:max-h-none">
           {dealerFiltrati.map((d) => {
             const on = d.id === selId
             return (
               <button
                 key={d.id}
                 onClick={() => seleziona(d)}
-                className="w-full rounded-xl px-3 py-2 text-left transition"
-                style={on ? { background: 'var(--brand)', color: '#fff' } : { color: 'var(--ink)' }}
+                className="w-full rounded-md px-2.5 py-1.5 text-left transition hover:bg-[var(--surface-2)]"
+                style={on ? { background: 'var(--surface-2)', boxShadow: 'inset 3px 0 0 var(--accent)', color: 'var(--ink)' } : { color: 'var(--ink)' }}
+                title={d.posizione && d.posizione !== 'indirizzo' ? `Posizione approssimativa (${d.posizione === 'cap' ? 'centro del CAP' : 'centro del comune'}). ${d.indirizzo}` : d.indirizzo}
               >
-                <div className={`truncate text-sm ${on ? 'font-bold' : 'font-medium'}`} style={on && tema === 'dark' ? { color: '#0b1220' } : undefined}>{d.nome}</div>
-                <div className="truncate text-[11px]" style={{ color: on ? (tema === 'dark' ? '#1b2a40' : '#c8d6ea') : 'var(--muted)' }}>{d.posizione && d.posizione !== 'indirizzo' ? '⚠ posizione approssimativa · ' : ''}{d.indirizzo}</div>
+                <div className={`truncate text-[12.5px] leading-tight ${on ? 'font-bold' : 'font-medium'}`}>{d.nome}</div>
+                <div className="truncate text-[10.5px] leading-snug" style={{ color: 'var(--muted)' }}>{d.posizione && d.posizione !== 'indirizzo' ? '⚠ ' : ''}{d.indirizzo}</div>
               </button>
             )
           })}
         </nav>
-        <div className="flex items-center gap-2 border-t px-4 py-3" style={{ borderColor: 'var(--line)' }}>
-          <button className="btn flex-1 justify-center" onClick={() => setModale('impostazioni')}>
-            <Settings size={15} /> Impostazioni
+        <div className="flex items-center gap-1.5 border-t px-3 py-2" style={{ borderColor: 'var(--line)' }}>
+          <button className="btn flex-1 justify-center !py-1 text-xs" onClick={() => setModale('impostazioni')}>
+            <Settings size={13} /> Impostazioni
           </button>
-          <button className="btn" onClick={() => setTema(tema === 'dark' ? 'light' : 'dark')} aria-label="Cambia tema" title="Tema chiaro o scuro">
-            {tema === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+          <button className="btn !px-2 !py-1" onClick={() => setTema(tema === 'dark' ? 'light' : 'dark')} aria-label="Cambia tema" title="Tema chiaro o scuro">
+            {tema === 'dark' ? <Sun size={13} /> : <Moon size={13} />}
           </button>
         </div>
       </aside>
@@ -481,15 +500,17 @@ export default function App() {
               </div>
             </header>
 
-            <div className="grid grid-cols-2 gap-2 px-5 pt-4 sm:grid-cols-4 xl:grid-cols-8">
+            <div className="px-5 pt-4">
+              <KpiRiga>
               <Kpi icona={<Users size={12} />} label="Abitanti" valore={compatto(t?.pop)} sotto={zona ? `${zona.comuni.length} comuni` : undefined} />
               <Kpi icona={<Car size={12} />} label="Autovetture" valore={compatto(t?.autovetture)} sotto={t && zona?.annoVeicoli ? `${pct(quotaVecchie(t.euro))} prima del 2006` : undefined} />
-              <Kpi icona={<Truck size={12} />} label="Veicoli merci" valore={compatto(t?.autocarri)} sotto={t ? `+ ${compatto(t.pesanti)} pesanti e rimorchi` : undefined} />
+              <Kpi icona={<Truck size={12} />} label="Veicoli merci" valore={compatto(t?.autocarri)} sotto={t ? `+ ${compatto(t.pesanti)} pesanti` : undefined} />
               <Kpi icona={<Building2 size={12} />} label="Unità locali" valore={compatto(t?.unitaLocali)} sotto="sedi operative" />
               <Kpi icona={<Users size={12} />} label="Addetti" valore={compatto(t?.addetti)} sotto="nelle unità locali" />
               <Kpi icona={<Factory size={12} />} label="UL 50+ addetti" valore={n0(t ? t.ulClassi[2] + t.ulClassi[3] : null)} sotto={t ? `di cui ${n0(t.ulClassi[3])} oltre 250` : undefined} />
-              <Kpi icona={<Wrench size={12} />} label="Officine e gommisti" valore={n0(t?.officine)} sotto={t && t.officine ? `${n0(t.autovetture / t.officine)} auto ciascuna` : undefined} />
-              <Kpi icona={<Layers size={12} />} label="Aziende in elenco" valore={n0(aziende.length)} sotto={esplorato ? 'solo quelle già acquistate qui' : aziende.length ? 'acquistate o importate' : 'vai su Aziende'} />
+              <Kpi icona={<Wrench size={12} />} label="Officine" valore={n0(t?.officine)} sotto={t && t.officine ? `${n0(t.autovetture / t.officine)} auto ciascuna` : undefined} />
+              <Kpi icona={<Layers size={12} />} label="Aziende" valore={n0(aziende.length)} sotto={esplorato ? 'solo quelle già acquistate qui' : aziende.length ? 'acquistate o importate' : 'vai su Aziende'} />
+              </KpiRiga>
             </div>
 
             {raggio < 3 && (

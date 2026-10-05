@@ -7,7 +7,7 @@ import { indiceComuni, trovaComune } from './importaDealer'
 import { indovinaColonne, leggiTabella, numero } from './leggiFile'
 import type { Zona } from './zone'
 
-export type Fonte = 'openapi' | 'import' | 'demo'
+export type Fonte = 'openapi' | 'import' | 'demo' | 'osm'
 
 export interface Azienda {
   id: string
@@ -34,6 +34,8 @@ export interface Azienda {
   posizione?: 'indirizzo' | 'comune'
   /** indirizzo già cercato in rete (trovato o no): non si riprova */
   cercato?: boolean
+  /** telefono o sito web, quando la fonte li ha (OpenStreetMap) */
+  contatto?: string
 }
 
 /** Posizione solo al centro del comune: gli elenchi importati vecchi non avevano il campo e sono tutti così. */

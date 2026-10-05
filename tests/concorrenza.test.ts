@@ -72,3 +72,28 @@ describe('imprese importate al centro del comune', async () => {
     expect(r.find((x) => x.nome === 'GOMME ROSSI')!.centroComune).toBe(true)
   })
 })
+
+describe('area allargata dei gommisti: il centro si sposta, l\'elenco no', async () => {
+  const { areaCopre, filtraConcorrenti, raggioDaCaricare } = await import('../src/lib/concorrenza')
+  const c = (nome: string, lat: number, lon: number) => ({ lat, lon, gommista: true, rete: '', gruppo: '', nome, distanzaKm: 0, fonte: 'osm' as const })
+  it('carica più largo di quanto chiesto', () => {
+    expect(raggioDaCaricare(0.5)).toBe(5)
+    expect(raggioDaCaricare(15)).toBe(22.5)
+    expect(raggioDaCaricare(80)).toBe(75)
+  })
+  it('un piccolo spostamento o un raggio un po\' più grande restano coperti, un salto no', () => {
+    const area = { lat: 45.18, lon: 9.15, raggioKm: 22.5 }
+    expect(areaCopre(area, 45.181, 9.151, 15)).toBe(true) // ricerca dell'indirizzo che sposta il centro
+    expect(areaCopre(area, 45.18, 9.15, 20)).toBe(true)
+    expect(areaCopre(area, 45.18, 9.15, 30)).toBe(false)
+    expect(areaCopre(area, 45.5, 9.7, 15)).toBe(false) // altro dealer
+  })
+  it('filtra per centro e raggio attuali e ricalcola le distanze', () => {
+    const tutti = [c('vicino', 45.1847, 9.1582), c('a 3 km', 45.21, 9.18), c('lontano', 45.4, 9.5)]
+    const r = filtraConcorrenti(tutti, 45.1847, 9.1582, 5)
+    expect(r.map((x) => x.nome)).toEqual(['vicino', 'a 3 km'])
+    expect(r[0].distanzaKm).toBe(0)
+    expect(r[1].distanzaKm).toBeGreaterThan(2.5)
+    expect(filtraConcorrenti(tutti, 45.1847, 9.1582, 0.5).map((x) => x.nome)).toEqual(['vicino'])
+  })
+})

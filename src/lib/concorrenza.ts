@@ -43,14 +43,47 @@ interface ElementoOsm {
   tags?: Record<string, string>
 }
 
+export interface AreaOsm {
+  lat: number
+  lon: number
+  raggioKm: number
+}
+
 export interface RisultatoConcorrenza {
+  /** tutte le officine dell'area caricata, distanza dal centro dell'area */
   concorrenti: Concorrente[]
   data: string
   daCache: boolean
   fonte: 'osm'
+  area?: AreaOsm
 }
 
-const chiave = (lat: number, lon: number, r: number) => `cmp.osm.v2.${lat.toFixed(3)}.${lon.toFixed(3)}.${r}`
+const PREFISSO = 'cmp.osm.v2.'
+const chiave = (lat: number, lon: number, r: number) => `${PREFISSO}${lat.toFixed(3)}.${lon.toFixed(3)}.${r}`
+
+/** Si carica un'area più larga di quella chiesta: spostare un po' il centro o allargare il raggio non rifà la richiesta. */
+export const raggioDaCaricare = (raggioKm: number) => Math.min(75, Math.max(5, Math.round(raggioKm * 1.5 * 10) / 10))
+
+/** Il cerchio chiesto sta tutto dentro l'area già caricata? */
+export const areaCopre = (area: AreaOsm, lat: number, lon: number, raggioKm: number) => distanzaKm(area.lat, area.lon, lat, lon) + raggioKm <= area.raggioKm + 1e-6
+
+/** Le officine di un'area, riferite al centro e al raggio attuali. */
+export function filtraConcorrenti(tutti: Concorrente[], lat: number, lon: number, raggioKm: number): Concorrente[] {
+  const out: Concorrente[] = []
+  for (const c of tutti) {
+    const d = distanzaKm(lat, lon, c.lat, c.lon)
+    if (d <= raggioKm) out.push({ ...c, distanzaKm: Math.round(d * 100) / 100 })
+  }
+  return out.sort((a, b) => a.distanzaKm - b.distanzaKm)
+}
+
+function salva(k: string, r: RisultatoConcorrenza) {
+  try {
+    localStorage.setItem(k, JSON.stringify(r))
+  } catch {
+    /* spazio pieno: si usa senza salvare */
+  }
+}
 
 export function convertiElementi(el: ElementoOsm[], lat: number, lon: number, raggioKm: number): Concorrente[] {
   const out: Concorrente[] = []
@@ -66,41 +99,48 @@ export function convertiElementi(el: ElementoOsm[], lat: number, lon: number, ra
   return out.sort((a, b) => a.distanzaKm - b.distanzaKm)
 }
 
-function salva(k: string, r: RisultatoConcorrenza) {
+/** Cerca nella memoria del browser un'area recente che copra il cerchio chiesto (anche salvata da versioni precedenti). */
+function dallaMemoria(lat: number, lon: number, raggioKm: number): RisultatoConcorrenza | null {
   try {
-    localStorage.setItem(k, JSON.stringify(r))
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) ?? ''
+      const m = k.startsWith(PREFISSO) ? k.slice(PREFISSO.length).match(/^(-?\d+\.\d+)\.(-?\d+\.\d+)\.(.+)$/) : null
+      if (!m) continue
+      const area: AreaOsm = { lat: Number(m[1]), lon: Number(m[2]), raggioKm: Number(m[3]) }
+      if (!areaCopre(area, lat, lon, raggioKm)) continue
+      const c = JSON.parse(localStorage.getItem(k) ?? 'null') as RisultatoConcorrenza | null
+      if (c && Date.now() - new Date(c.data).getTime() < GIORNI_VALIDITA * 864e5) return { ...c, daCache: true, area }
+    }
   } catch {
-    /* spazio pieno: si usa senza salvare */
+    /* storage non disponibile */
   }
+  return null
 }
 
 /** Officine mappate in OpenStreetMap: gratis, copertura parziale. Salvate 30 giorni. */
-export async function caricaConcorrenzaOsm(lat: number, lon: number, raggioKm: number, forza = false): Promise<RisultatoConcorrenza> {
-  const k = chiave(lat, lon, raggioKm)
+export async function caricaConcorrenzaOsm(lat: number, lon: number, raggioKm: number, forza = false, http: typeof fetch = fetch): Promise<RisultatoConcorrenza> {
   if (!forza) {
-    try {
-      const c = JSON.parse(localStorage.getItem(k) ?? 'null') as RisultatoConcorrenza | null
-      if (c && Date.now() - new Date(c.data).getTime() < GIORNI_VALIDITA * 864e5) return { ...c, daCache: true }
-    } catch {
-      /* storage non disponibile */
-    }
+    const c = dallaMemoria(lat, lon, raggioKm)
+    if (c) return c
   }
-  const m = Math.round(raggioKm * 1000)
+  const rc = raggioDaCaricare(raggioKm)
+  const m = Math.round(rc * 1000)
   const q = `[out:json][timeout:90];(nwr["shop"="tyres"](around:${m},${lat},${lon});nwr["shop"="car_repair"](around:${m},${lat},${lon});nwr["craft"="tyres"](around:${m},${lat},${lon}););out center tags;`
   let ultimoErrore = ''
   for (const url of SERVER) {
     try {
       const ctrl = new AbortController()
       const t = setTimeout(() => ctrl.abort(), 70000)
-      const res = await fetch(url, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctrl.signal })
+      const res = await http(url, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctrl.signal })
       clearTimeout(t)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const j = (await res.json()) as { elements: ElementoOsm[] }
-      const r: RisultatoConcorrenza = { concorrenti: convertiElementi(j.elements, lat, lon, raggioKm), data: new Date().toISOString(), daCache: false, fonte: 'osm' }
-      salva(k, r)
+      const j = (await res.json()) as { elements: ElementoOsm[]; remark?: string }
+      if (j.remark && /timed out|out of memory|runtime error/i.test(j.remark)) throw new Error('il server è sovraccarico')
+      const r: RisultatoConcorrenza = { concorrenti: convertiElementi(j.elements, lat, lon, rc), data: new Date().toISOString(), daCache: false, fonte: 'osm', area: { lat, lon, raggioKm: rc } }
+      salva(chiave(lat, lon, rc), r)
       return r
     } catch (e) {
-      ultimoErrore = (e as Error).message
+      ultimoErrore = (e as Error).name === 'AbortError' ? 'tempo scaduto' : (e as Error).message
     }
   }
   throw new Error(`OpenStreetMap non risponde (${ultimoErrore}). Riprova tra qualche minuto.`)

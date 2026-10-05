@@ -1,19 +1,28 @@
 import { ArrowDown, ArrowUp } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
+/** Una cella dell'indicatore in alto: sobria, su una riga, senza bordi propri (li disegna KpiRiga). */
 export function Kpi({ label, valore, sotto, icona }: { label: string; valore: string; sotto?: string; icona?: ReactNode }) {
   return (
-    <div className="rounded-xl border p-3" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
-      <div className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide" style={{ color: 'var(--muted)' }}>
+    <div className="min-w-0 px-3.5 py-2.5" style={{ background: 'var(--surface)' }} title={`${label}: ${valore}${sotto ? ` · ${sotto}` : ''}`}>
+      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: 'var(--muted)' }}>
         {icona}
-        {label}
+        <span className="truncate">{label}</span>
       </div>
-      <div className="mt-1 text-xl font-bold leading-tight">{valore}</div>
-      {sotto && (
-        <div className="mt-0.5 text-[11px]" style={{ color: 'var(--ink-2)' }}>
-          {sotto}
-        </div>
-      )}
+      <div className="num mt-0.5 whitespace-nowrap text-[17px] font-semibold leading-tight">{valore}</div>
+      <div className="truncate text-[10.5px] leading-snug" style={{ color: 'var(--ink-2)', minHeight: '1.1em' }}>{sotto ?? ''}</div>
+    </div>
+  )
+}
+
+/** Gli indicatori in un unico riquadro, separati da filetti sottili. */
+export function KpiRiga({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border sm:grid-cols-4 xl:grid-cols-8"
+      style={{ borderColor: 'var(--line)', background: 'var(--line)', boxShadow: 'var(--shadow)' }}
+    >
+      {children}
     </div>
   )
 }

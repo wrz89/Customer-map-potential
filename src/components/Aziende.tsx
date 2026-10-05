@@ -1,8 +1,9 @@
-import { Coins, Database, FileUp, FlaskConical, Search, Trash2 } from 'lucide-react'
+import { Coins, Database, FileUp, FlaskConical, Map as MapIcon, Search, Trash2 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { CATEGORIE } from '../lib/categories'
 import { acquistaOpenapi, generaDemo, importaElenco, stimaOpenapi, type Azienda, type StimaOpenapi } from '../lib/companies'
 import { distKm, eur, n0 } from '../lib/fmt'
+import { RAGGIO_MAX_OSM_KM, cercaAttivitaOsm } from '../lib/osmAziende'
 import type { Acquisto, Dealer } from '../lib/store'
 import type { Zona } from '../lib/zone'
 import { GuidaTelemaco } from './GuidaTelemaco'
@@ -90,6 +91,28 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
     await onNuovoAcquisto(nuovoAcquisto('demo', lista, 0))
     setInfo(`Generate ${lista.length} aziende DIMOSTRATIVE a partire dai conteggi ISTAT. Non sono aziende reali: servono a provare mappa, tabelle ed Excel.`)
     setOccupato(null)
+  }
+
+  async function cercaSuOsm() {
+    setErrore(null)
+    setInfo(null)
+    setOccupato('osm')
+    try {
+      const r = await cercaAttivitaOsm(zona.centro.lat, zona.centro.lon, zona.raggioKm)
+      if (!r.aziende.length) {
+        setInfo(`OpenStreetMap non conosce attività con un nome entro ${distKm(zona.raggioKm)} (${n0(r.ricevuti)} elementi ricevuti). Prova un raggio più grande o un elenco Telemaco.`)
+        return
+      }
+      await onNuovoAcquisto(nuovoAcquisto('osm', r.aziende, 0))
+      const perCat = new Map<string, number>()
+      for (const a of r.aziende) perCat.set(a.categoria, (perCat.get(a.categoria) ?? 0) + 1)
+      const top = [...perCat.entries()].sort((x, y) => y[1] - x[1]).slice(0, 4).map(([c, n]) => `${c} ${n0(n)}`).join(', ')
+      setInfo(`Trovate ${n0(r.aziende.length)} attività con nome da OpenStreetMap (${top}). Non hanno addetti né partita IVA, e la copertura è parziale: Telemaco le completa.`)
+    } catch (e) {
+      setErrore((e as Error).message)
+    } finally {
+      setOccupato(null)
+    }
   }
 
   async function importa(file: File) {
@@ -219,6 +242,15 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
             <input ref={fileRef} type="file" accept=".xlsx,.csv" className="hidden" onChange={(e) => e.target.files?.[0] && importa(e.target.files[0])} />
           </div>
           <div>
+            <button className="btn w-full justify-center" onClick={cercaSuOsm} disabled={!!occupato || zona.raggioKm > RAGGIO_MAX_OSM_KM}>
+              <MapIcon size={15} /> {occupato === 'osm' ? 'Cerco su OpenStreetMap…' : 'Cerca tutte le attività su OpenStreetMap'}
+            </button>
+            <p className="mt-1 text-[11px]" style={{ color: 'var(--muted)' }}>
+              Gratis: negozi, studi, artigiani, locali, scuole, sanità, industrie con un nome in mappa, fino a {RAGGIO_MAX_OSM_KM} km.
+              {zona.raggioKm > RAGGIO_MAX_OSM_KM ? ` Con ${distKm(zona.raggioKm)} è troppo grande: restringi il raggio.` : ' Può richiedere un minuto.'} Senza addetti né partita IVA. © OpenStreetMap contributors.
+            </p>
+          </div>
+          <div>
             <button className="btn w-full justify-center" onClick={eseguiDemo} disabled={!!occupato}>
               <FlaskConical size={15} /> Genera dati dimostrativi
             </button>
@@ -254,7 +286,7 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
                 {acquisti.map((a) => (
                   <tr key={a.id}>
                     <td>{new Date(a.data).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                    <td><span className="inline-flex items-center gap-1"><Database size={13} /> {{ openapi: 'Openapi', import: 'File importato', demo: 'Dimostrativo' }[a.fonte]}</span></td>
+                    <td><span className="inline-flex items-center gap-1"><Database size={13} /> {{ openapi: 'Openapi', import: 'File importato', demo: 'Dimostrativo', osm: 'OpenStreetMap' }[a.fonte]}</span></td>
                     <td className="r">{distKm(a.raggioKm)}</td>
                     <td className="text-xs">{a.filtri.minDipendenti ? `${a.filtri.minDipendenti}+ dipendenti` : 'tutti'}{a.filtri.ateco?.length ? ` · ${a.filtri.ateco.length} ATECO` : ''}</td>
                     <td className="r">{n0(a.conteggio)}</td>

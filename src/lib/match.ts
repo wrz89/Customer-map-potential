@@ -142,7 +142,7 @@ export function preparaClienti(clienti: Cliente[]) {
   return { perPiva, perIndirizzo, lista, perToken }
 }
 
-export function confronta(p: Prospect, idx: ReturnType<typeof preparaClienti>): EsitoMatch {
+export function confronta(p: Prospect, idx: ReturnType<typeof preparaClienti>, rapido = false): EsitoMatch {
   const piva = normalizzaPiva(p.piva)
   if (piva && idx.perPiva.has(piva)) {
     return { stato: 'Già cliente', punteggio: 1, cliente: idx.perPiva.get(piva), motivo: 'Partita IVA uguale' }
@@ -153,7 +153,8 @@ export function confronta(p: Prospect, idx: ReturnType<typeof preparaClienti>): 
   const candidati = new Set<number>()
   for (const t of tokens(nome)) for (const i of idx.perToken.get(t) ?? []) candidati.add(i)
   // con pochi clienti si confronta tutto, con molti solo chi condivide almeno una parola
-  const pool = idx.lista.length <= 3000 ? idx.lista.map((_, i) => i) : [...candidati]
+  // con migliaia di prospect (OpenStreetMap) si confronta solo chi condivide una parola, altrimenti l'app si ferma
+  const pool = idx.lista.length <= 3000 && !rapido ? idx.lista.map((_, i) => i) : [...candidati]
   for (const i of pool) {
     const s = somiglianza(nome, idx.lista[i].nome)
     if (s > best) {

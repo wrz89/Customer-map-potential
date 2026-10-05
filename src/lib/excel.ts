@@ -121,6 +121,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
     [''],
     ['Fonti'],
     ...Object.values(d.meta?.fonti ?? {}).filter(Boolean).map((f) => [String(f)]),
+    ...(aziende.some((a) => a.fonte === 'osm') ? [['Aziende con Fonte OSM: da © OpenStreetMap contributors (ODbL). Solo attività con un nome in mappa: nessun dato su dipendenti o partita IVA, copertura parziale. La colonna PEC o contatto riporta telefono o sito, se mappati.']] : []),
     ...(aziende.some((a) => a.fonte === 'demo') ? [['ATTENZIONE: le aziende di questo file sono DIMOSTRATIVE, generate a partire dai conteggi ISTAT. Non sono aziende reali.']] : []),
   ]
   istruzioni.forEach((r, i) => {
@@ -137,7 +138,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
   const colAz = [
     ['Ragione sociale', 42], ['Partita IVA', 14], ['Categoria', 30], ['Intensità flotta', 11], ['ATECO', 10],
     ['Attività', 36], ['Dipendenti', 11], ['Fatturato €', 14], ['Anno bilancio', 9], ['Indirizzo sede legale', 34],
-    ['CAP', 7], ['Comune', 20], ['Prov.', 6], ['Distanza km', 10], ['PEC', 30], ['Fonte', 9],
+    ['CAP', 7], ['Comune', 20], ['Prov.', 6], ['Distanza km', 10], ['PEC o contatto', 30], ['Fonte', 9],
     ['Chiave nome', 30], ['Stato', 17], ['Confronto app', 17], ['Cliente abbinato (app)', 34],
   ] as const
   intestazione(az, 1, colAz.map((c) => c[0]))
@@ -150,7 +151,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
     row.values = [
       a.ragioneSociale, a.piva, a.categoria, a.flotta, a.ateco, a.atecoDescr, a.dipendenti ?? undefined,
       a.fatturato ?? undefined, a.annoBilancio ?? undefined, a.indirizzo, a.cap, a.comune, a.provincia,
-      a.distanzaKm ?? undefined, a.pec, a.fonte === 'demo' ? 'DEMO' : a.fonte === 'openapi' ? 'Openapi' : 'Import',
+      a.distanzaKm ?? undefined, a.pec || a.contatto || '', a.fonte === 'demo' ? 'DEMO' : a.fonte === 'openapi' ? 'Openapi' : a.fonte === 'osm' ? 'OSM' : 'Import',
     ]
     row.getCell(2).numFmt = '@'
     const ultimaAz = aziende.length + 1
