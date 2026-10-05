@@ -195,3 +195,90 @@ body {
   border: 2px solid transparent;
   background-clip: content-box;
 }
+
+/* schede e suggerimenti sulla mappa */
+.cmp-tip .maplibregl-popup-content {
+  padding: 6px 10px !important;
+  font-size: 12px;
+}
+.cmp-card {
+  font-size: 12px;
+  line-height: 1.45;
+  min-width: 220px;
+}
+.cmp-card .t {
+  font-weight: 700;
+  font-size: 13.5px;
+  padding-right: 14px;
+}
+.cmp-card .s {
+  color: var(--ink-2);
+}
+.cmp-card .m {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 11px;
+}
+.cmp-card .demo {
+  display: inline-block;
+  margin: 4px 0;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--surface-2);
+  color: var(--critical);
+  border: 1px solid var(--line);
+}
+.cmp-card table {
+  width: 100%;
+  margin: 6px 0;
+  border-collapse: collapse;
+}
+.cmp-card td {
+  padding: 2px 0;
+  border-bottom: 1px solid var(--line);
+}
+.cmp-card td:last-child {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding-left: 12px;
+}
+.cmp-card .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  margin-right: 5px;
+}
+.cmp-card .row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.cmp-btn {
+  flex: 1;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-weight: 600;
+  font-size: 12px;
+  background: var(--brand);
+  color: #fff;
+  border: 1px solid var(--brand);
+  cursor: pointer;
+}
+:root[data-theme='dark'] .cmp-btn {
+  color: #0b1220;
+}
+.cmp-btn.sec {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.maplibregl-popup-close-button {
+  color: var(--ink-2);
+  font-size: 18px;
+  padding: 0 6px;
+}

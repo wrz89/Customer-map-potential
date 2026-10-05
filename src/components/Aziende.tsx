@@ -6,7 +6,7 @@ import { eur, n0, n1 } from '../lib/fmt'
 import { indovinaColonne, leggiTabella, numero } from '../lib/leggiFile'
 import type { Acquisto, Dealer } from '../lib/store'
 import type { Zona } from '../lib/zone'
-import { Avviso, FlottaBadge, Sezione, Tabella, type Colonna } from './ui'
+import { Avviso, BottoneConferma, FlottaBadge, Sezione, Tabella, type Colonna } from './ui'
 
 interface Props {
   zona: Zona
@@ -66,8 +66,6 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
 
   async function eseguiAcquisto() {
     if (!stima || stima.demo) return
-    const testo = `Confermi l'acquisto di ${stima.conteggio ?? '?'} aziende${stima.prezzo !== null ? ` per circa ${eur(stima.prezzo)}` : ''}${stima.sandbox ? ' (ambiente di prova Openapi)' : ''}?`
-    if (!confirm(testo)) return
     setErrore(null)
     setOccupato('acquisto')
     try {
@@ -211,9 +209,17 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
                   <b className="num">{stima.prezzo === null ? 'prezzo n.d.' : eur(stima.prezzo)}</b>
                   {stima.sandbox && <span className="ml-1 text-xs" style={{ color: 'var(--muted)' }}>(ambiente di prova)</span>}
                 </div>
-                <button className="btn btn-accent" onClick={eseguiAcquisto} disabled={!!occupato || stima.conteggio === 0}>
-                  <Coins size={15} /> {occupato === 'acquisto' ? 'Acquisto in corso…' : 'Acquista'}
-                </button>
+                {occupato === 'acquisto' ? (
+                  <button className="btn btn-accent" disabled>
+                    <Coins size={15} /> Acquisto in corso…
+                  </button>
+                ) : (
+                  stima.conteggio !== 0 && (
+                    <BottoneConferma className="btn btn-accent" domanda={`Conferma: paga ${stima.prezzo !== null ? eur(stima.prezzo) : 'il prezzo indicato'}`} onConferma={eseguiAcquisto}>
+                      <Coins size={15} /> Acquista
+                    </BottoneConferma>
+                  )
+                )}
               </>
             )}
           </div>
@@ -274,9 +280,9 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
                     <td className="r">{n0(a.conteggio)}</td>
                     <td className="r">{a.prezzo === null ? '–' : eur(a.prezzo)}</td>
                     <td className="r">
-                      <button className="btn !px-2 !py-1" title="Elimina" onClick={() => confirm('Eliminare queste aziende dal registro?') && onElimina(a.id)}>
+                      <BottoneConferma className="btn !px-2 !py-1" title="Elimina dal registro" domanda="Elimina" onConferma={() => onElimina(a.id)}>
                         <Trash2 size={14} />
-                      </button>
+                      </BottoneConferma>
                     </td>
                   </tr>
                 ))}

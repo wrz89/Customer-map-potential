@@ -32,9 +32,12 @@ function apiLocale(env: Record<string, string>): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  // "npm run build:demo": pagina autonoma per claude.ai, con percorsi relativi
+  const demo = mode === 'demo'
   return {
+    base: demo ? './' : '/',
     plugins: [react(), tailwindcss(), apiLocale(env)],
-    build: { chunkSizeWarningLimit: 2500 },
+    build: { chunkSizeWarningLimit: 2500, outDir: demo ? 'dist-demo' : 'dist' },
     // MapLibre carica il suo worker con new URL(..., import.meta.url): non va pre-impacchettato
     optimizeDeps: { exclude: ['maplibre-gl'] },
     worker: { format: 'es' as const },

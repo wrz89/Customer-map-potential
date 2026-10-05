@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "oxlint",
-    "dati": "python3 scripts/build_data.py"
+    "dati": "python3 scripts/build_data.py",
+    "build:demo": "vite build --mode demo && python3 scripts/pagina_demo.py"
   },
   "dependencies": {
     "@turf/turf": "^7.4.0",

@@ -4,7 +4,6 @@ import {
   Download,
   Factory,
   Layers,
-  Map as MapIcon,
   Moon,
   Pencil,
   Plus,
@@ -14,17 +13,19 @@ import {
   Users,
   Wrench,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Aziende from './components/Aziende'
 import Confronto from './components/Confronto'
 import { DealerForm } from './components/DealerForm'
 import { Impostazioni } from './components/Impostazioni'
-import MapView, { METRICHE, type Metrica } from './components/MapView'
+import MapView, { type Centro, type Metrica } from './components/MapView'
 import Settori from './components/Settori'
 import Territorio from './components/Territorio'
 import { Avviso, Kpi } from './components/ui'
 import type { Azienda } from './lib/companies'
-import { loadMeta, type Meta } from './lib/data'
+import { DEMO, salvaFile } from './lib/ambiente'
+import { generaDemo } from './lib/companies'
+import { loadComuni, loadMeta, type Meta } from './lib/data'
 import { compatto, n0 } from './lib/fmt'
 import { distanzaKm } from './lib/geo'
 import { confronta, preparaClienti, type Cliente, type EsitoMatch } from './lib/match'
@@ -55,6 +56,9 @@ const TABS: { id: Tab; nome: string }[] = [
 ]
 
 function temaIniziale(): 'light' | 'dark' {
+  // una scelta esplicita della pagina che ci ospita vale per prima
+  const ospite = document.documentElement.dataset.theme
+  if (ospite === 'light' || ospite === 'dark') return ospite
   try {
     const t = localStorage.getItem('cmp.tema')
     if (t === 'light' || t === 'dark') return t
@@ -84,8 +88,16 @@ export default function App() {
   const [cercaDealer, setCercaDealer] = useState('')
   const [comuneEvid, setComuneEvid] = useState<string | null>(null)
   const [esporto, setEsporto] = useState(false)
+  // punto esplorato sulla mappa: sostituisce il dealer come centro dell'analisi
+  const [esplorato, setEsplorato] = useState<{ lat: number; lon: number; nome: string } | null>(null)
+  const [preset, setPreset] = useState<Partial<Dealer> | null>(null)
 
   const sel = dealer.find((d) => d.id === selId) ?? null
+  const centro: Centro | null = esplorato
+    ? { ...esplorato, esplorativo: true }
+    : sel
+      ? { lat: sel.lat, lon: sel.lon, nome: sel.nome, esplorativo: false }
+      : null
 
   useEffect(() => {
     document.documentElement.dataset.theme = tema
@@ -102,7 +114,7 @@ export default function App() {
 
   // calcolo zona (con piccolo ritardo mentre si trascina il cursore del raggio)
   useEffect(() => {
-    if (!sel) {
+    if (!centro) {
       setZona(null)
       return
     }
@@ -110,7 +122,7 @@ export default function App() {
     setCalcolo(true)
     setErrore(null)
     const t = setTimeout(() => {
-      calcolaZona(sel.lat, sel.lon, raggio)
+      calcolaZona(centro.lat, centro.lon, raggio)
         .then((z) => !annullato && setZona(z))
         .catch((e) => !annullato && setErrore((e as Error).message))
         .finally(() => !annullato && setCalcolo(false))
@@ -119,7 +131,7 @@ export default function App() {
       annullato = true
       clearTimeout(t)
     }
-  }, [sel?.id, sel?.lat, sel?.lon, raggio]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [centro?.lat, centro?.lon, raggio]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const ricaricaDati = useCallback(async (id: string) => {
     const [a, l] = await Promise.all([acquistiDealer(id), caricaClienti(id)])
@@ -131,9 +143,40 @@ export default function App() {
     if (selId) ricaricaDati(selId)
   }, [selId, ricaricaDati])
 
+  // demo: al primo calcolo di un dealer si generano le aziende dimostrative, così la mappa è subito piena
+  const demoFatti = useRef(new Set<string>())
+  useEffect(() => {
+    if (!DEMO || !sel || !zona || esplorato || demoFatti.current.has(sel.id)) return
+    if (Math.abs(zona.centro.lat - sel.lat) > 1e-6 || Math.abs(zona.centro.lon - sel.lon) > 1e-6) return
+    demoFatti.current.add(sel.id)
+    acquistiDealer(sel.id).then(async (gia) => {
+      if (gia.length) return
+      const lista = generaDemo(zona, 10)
+      await salvaAcquisto({ id: `demo-${sel.id}`, dealerId: sel.id, data: new Date().toISOString(), raggioKm: zona.raggioKm, centro: zona.centro, filtri: { minDipendenti: 10 }, fonte: 'demo', conteggio: lista.length, prezzo: 0, aziende: lista })
+      await ricaricaDati(sel.id)
+    })
+  }, [zona, sel, esplorato, ricaricaDati])
+
   function seleziona(d: Dealer) {
     setSelId(d.id)
     setRaggio(d.raggioKm)
+    setComuneEvid(null)
+    setEsplorato(null)
+  }
+
+  async function spostaCentro(lat: number, lon: number, nome?: string) {
+    let etichetta = nome
+    if (!etichetta) {
+      // nome del comune più vicino, senza chiamate esterne
+      const comuni = await loadComuni().catch(() => [])
+      let best: { n: string; d: number } | null = null
+      for (const c of comuni) {
+        const d = distanzaKm(lat, lon, c.lat, c.lon)
+        if (!best || d < best.d) best = { n: c.n, d }
+      }
+      etichetta = best ? `vicino a ${best.n}` : 'Punto esplorato'
+    }
+    setEsplorato({ lat, lon, nome: etichetta })
     setComuneEvid(null)
   }
 
@@ -154,9 +197,9 @@ export default function App() {
       }
     }
     return [...m.values()]
-      .map((a) => (a.lat !== null && a.lon !== null ? { ...a, distanzaKm: Math.round(distanzaKm(sel.lat, sel.lon, a.lat, a.lon) * 10) / 10 } : a))
+      .map((a) => (a.lat !== null && a.lon !== null && centro ? { ...a, distanzaKm: Math.round(distanzaKm(centro.lat, centro.lon, a.lat, a.lon) * 10) / 10 } : a))
       .filter((a) => a.distanzaKm === null || a.distanzaKm <= raggio)
-  }, [acquisti, sel, raggio])
+  }, [acquisti, sel, centro?.lat, centro?.lon, raggio]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const esiti = useMemo(() => {
     const out = new Map<string, EsitoMatch>()
@@ -171,14 +214,14 @@ export default function App() {
     setEsporto(true)
     try {
       const { creaExcel, nomeFile } = await import('./lib/excel')
-      const blob = await creaExcel({ dealer: sel, zona, meta, aziende, clienti: lista?.clienti, esiti: lista ? esiti : undefined })
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = nomeFile(sel, raggio)
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000)
+      const soggetto: Dealer = esplorato
+        ? { ...sel, id: 'esplorato', nome: `Punto esplorato ${esplorato.nome}`, indirizzo: `${esplorato.lat.toFixed(5)}, ${esplorato.lon.toFixed(5)}`, lat: esplorato.lat, lon: esplorato.lon }
+        : sel
+      const blob = await creaExcel({ dealer: soggetto, zona, meta, aziende, clienti: lista?.clienti, esiti: lista ? esiti : undefined })
+      await salvaFile(nomeFile(soggetto, raggio), blob)
     } catch (e) {
-      setErrore(`Export non riuscito: ${(e as Error).message}`)
+      const codice = (e as { code?: string }).code
+      if (codice !== 'declined') setErrore(`Export non riuscito: ${(e as Error).message ?? codice}`)
     } finally {
       setEsporto(false)
     }
@@ -186,7 +229,8 @@ export default function App() {
 
   const dealerFiltrati = dealer.filter((d) => !cercaDealer || `${d.nome} ${d.indirizzo}`.toLowerCase().includes(cercaDealer.toLowerCase()))
   const altri = dealer.filter((d) => d.id !== selId)
-  const altriNelRaggio = sel ? altri.filter((d) => distanzaKm(sel.lat, sel.lon, d.lat, d.lon) <= raggio) : []
+  const altriNelRaggio = centro ? (esplorato ? dealer : altri).filter((d) => distanzaKm(centro.lat, centro.lon, d.lat, d.lon) <= raggio) : []
+  const kmDalDealer = esplorato && sel ? distanzaKm(sel.lat, sel.lon, esplorato.lat, esplorato.lon) : 0
   const t = zona?.totale
 
   return (
@@ -194,7 +238,7 @@ export default function App() {
       {/* ---------- barra laterale ---------- */}
       <aside className="flex shrink-0 flex-col border-b lg:h-full lg:w-[300px] lg:border-r lg:border-b-0" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
         <div className="flex items-center gap-3 px-4 py-4">
-          <img src="/favicon.svg" alt="" className="h-9 w-9" />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" className="h-9 w-9" />
           <div>
             <div className="text-[15px] font-bold leading-tight">Customer Map Potential</div>
             <div className="text-xs" style={{ color: 'var(--muted)' }}>Rete SuperService · uso interno</div>
@@ -237,6 +281,11 @@ export default function App() {
 
       {/* ---------- contenuto ---------- */}
       <main className="flex min-w-0 flex-1 flex-col lg:h-full lg:overflow-hidden">
+        {DEMO && (
+          <div className="border-b px-5 py-2 text-xs" style={{ background: 'var(--surface-2)', borderColor: 'var(--line)', color: 'var(--ink-2)' }}>
+            <b style={{ color: 'var(--ink)' }}>Demo.</b> Comuni, veicoli e settori sono dati pubblici reali ISTAT e ACI-PRA. Le aziende sono dimostrative. Acquisto dei nominativi, ricerca indirizzi e mappa stradale di sfondo funzionano nella versione su Vercel.
+          </div>
+        )}
         {!sel ? (
           <div className="m-auto max-w-md p-8 text-center">
             <div className="text-lg font-bold">Aggiungi il primo dealer</div>
@@ -249,17 +298,37 @@ export default function App() {
           <>
             <header className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b px-5 py-3" style={{ background: 'var(--surface)', borderColor: 'var(--line)' }}>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="truncate text-lg font-bold">{sel.nome}</h1>
-                  <button className="btn !px-1.5 !py-1" onClick={() => setModale('modifica')} title="Modifica dealer">
-                    <Pencil size={13} />
-                  </button>
-                </div>
-                <div className="truncate text-xs" style={{ color: 'var(--muted)' }}>
-                  {sel.indirizzo}
-                  {sel.note ? ` · ${sel.note}` : ''}
-                  {altriNelRaggio.length > 0 && <span style={{ color: 'var(--ink-2)' }}> · {altriNelRaggio.length} altri SuperService nel raggio: {altriNelRaggio.map((d) => d.nome).join(', ')}</span>}
-                </div>
+                {esplorato ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full px-2 py-0.5 text-[11px] font-bold uppercase" style={{ background: 'var(--accent)', color: 'var(--accent-ink)' }}>Punto esplorato</span>
+                      <h1 className="truncate text-lg font-bold">{esplorato.nome}</h1>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
+                      <span>{n0(kmDalDealer)} km da {sel.nome}</span>
+                      <button className="btn !px-2 !py-0.5 text-xs" onClick={() => { setPreset({ nome: '', indirizzo: esplorato.nome, lat: esplorato.lat, lon: esplorato.lon, raggioKm: raggio }); setModale('nuovo') }}>
+                        Salva come dealer
+                      </button>
+                      <button className="btn !px-2 !py-0.5 text-xs" onClick={() => setEsplorato(null)}>
+                        Torna a {sel.nome}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <h1 className="truncate text-lg font-bold">{sel.nome}</h1>
+                      <button className="btn !px-1.5 !py-1" onClick={() => setModale('modifica')} title="Modifica dealer">
+                        <Pencil size={13} />
+                      </button>
+                    </div>
+                    <div className="truncate text-xs" style={{ color: 'var(--muted)' }}>
+                      {sel.indirizzo}
+                      {sel.note ? ` · ${sel.note}` : ''}
+                      {altriNelRaggio.length > 0 && <span style={{ color: 'var(--ink-2)' }}> · {altriNelRaggio.length} altri SuperService nel raggio: {altriNelRaggio.map((d) => d.nome).join(', ')}</span>}
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-semibold" style={{ color: 'var(--ink-2)' }}>Raggio</span>
@@ -282,7 +351,7 @@ export default function App() {
               <Kpi icona={<Users size={12} />} label="Addetti" valore={compatto(t?.addetti)} sotto="nelle unità locali" />
               <Kpi icona={<Factory size={12} />} label="UL 50+ addetti" valore={n0(t ? t.ulClassi[2] + t.ulClassi[3] : null)} sotto={t ? `di cui ${n0(t.ulClassi[3])} oltre 250` : undefined} />
               <Kpi icona={<Wrench size={12} />} label="Officine e gommisti" valore={n0(t?.officine)} sotto={t && t.officine ? `${n0(t.autovetture / t.officine)} auto ciascuna` : undefined} />
-              <Kpi icona={<Layers size={12} />} label="Aziende in elenco" valore={n0(aziende.length)} sotto={aziende.length ? 'acquistate o importate' : 'vai su Aziende'} />
+              <Kpi icona={<Layers size={12} />} label="Aziende in elenco" valore={n0(aziende.length)} sotto={esplorato ? 'solo quelle già acquistate qui' : aziende.length ? 'acquistate o importate' : 'vai su Aziende'} />
             </div>
 
             <div className="flex items-center gap-1 overflow-x-auto px-5 pt-4">
@@ -307,25 +376,24 @@ export default function App() {
                 <div className="card relative overflow-hidden" style={{ height: 'max(460px, calc(100vh - 290px))', display: tab === 'mappa' ? undefined : 'none' }}>
                   <MapView
                     zona={zona}
-                    dealer={sel}
-                    altriDealer={altri}
+                    centro={centro}
+                    altriDealer={esplorato ? dealer : altri}
                     aziende={aziende}
+                    esiti={lista ? esiti : undefined}
                     metrica={metrica}
+                    onMetrica={setMetrica}
                     tema={tema}
                     visibile={tab === 'mappa'}
-                    onSelezionaComune={(c) => {
+                    onSpostaCentro={spostaCentro}
+                    onApriComune={(c) => {
                       setComuneEvid(c)
                       setTab('territorio')
                     }}
+                    onSelezionaDealer={(id) => {
+                      const d = dealer.find((x) => x.id === id)
+                      if (d) seleziona(d)
+                    }}
                   />
-                  <div className="card absolute left-3 top-3 flex items-center gap-2 px-3 py-2 text-xs">
-                    <MapIcon size={14} />
-                    <select className="bg-transparent font-semibold outline-none" value={metrica} onChange={(e) => setMetrica(e.target.value as Metrica)} aria-label="Colora i comuni per">
-                      {Object.entries(METRICHE).map(([k, v]) => (
-                        <option key={k} value={k}>{v.nome}</option>
-                      ))}
-                    </select>
-                  </div>
                 </div>
               )}
               {tab === 'territorio' && zona && <Territorio zona={zona} evidenziato={comuneEvid} />}
@@ -375,11 +443,16 @@ export default function App() {
 
       {modale === 'nuovo' && (
         <DealerForm
-          onClose={() => setModale(null)}
+          preset={preset ?? undefined}
+          onClose={() => {
+            setModale(null)
+            setPreset(null)
+          }}
           onSalva={(d) => {
             aggiornaDealer([...dealer, d])
             seleziona(d)
             setModale(null)
+            setPreset(null)
           }}
         />
       )}

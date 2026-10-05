@@ -1,4 +1,5 @@
 // Dati salvati nel browser: dealer, impostazioni, acquisti e liste clienti.
+import { DEMO } from './ambiente'
 import type { Azienda } from './companies'
 import type { Cliente } from './match'
 
@@ -17,6 +18,15 @@ const K_IMPOST = 'cmp.impostazioni.v1'
 
 const DEALER_ESEMPIO: Dealer[] = [
   { id: 'esempio-pavia', nome: 'SuperService Pavia (esempio)', indirizzo: 'Pavia, centro', lat: 45.1847, lon: 9.1582, raggioKm: 15, note: 'Punto di esempio: sostituisci con l\'indirizzo reale del dealer' },
+  // nella demo qualche punto in più, per vedere gli altri SuperService sulla mappa
+  ...(DEMO
+    ? [
+        { id: 'esempio-milano-sud', nome: 'SuperService Milano Sud (esempio)', indirizzo: 'Rozzano, centro', lat: 45.381, lon: 9.155, raggioKm: 10 },
+        { id: 'esempio-lodi', nome: 'SuperService Lodi (esempio)', indirizzo: 'Lodi, centro', lat: 45.3138, lon: 9.5037, raggioKm: 15 },
+        { id: 'esempio-vigevano', nome: 'SuperService Vigevano (esempio)', indirizzo: 'Vigevano, centro', lat: 45.3168, lon: 8.8574, raggioKm: 15 },
+        { id: 'esempio-bergamo', nome: 'SuperService Bergamo (esempio)', indirizzo: 'Bergamo, centro', lat: 45.6983, lon: 9.6773, raggioKm: 15 },
+      ]
+    : []),
 ]
 
 function leggi<T>(k: string, def: T): T {

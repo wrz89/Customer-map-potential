@@ -5,7 +5,7 @@ import { n0, n1 } from '../lib/fmt'
 import { indovinaColonne, leggiTabella } from '../lib/leggiFile'
 import { STATI, type Cliente, type EsitoMatch, type StatoMatch } from '../lib/match'
 import type { ListaClienti } from '../lib/store'
-import { Avviso, FlottaBadge, Sezione, Tabella, type Colonna } from './ui'
+import { Avviso, BottoneConferma, FlottaBadge, Sezione, Tabella, type Colonna } from './ui'
 
 export const STATO_STILE: Record<StatoMatch, { colore: string; icona: ReactNode; nota: string }> = {
   'Già cliente': { colore: 'var(--muted)', icona: <UserCheck size={14} />, nota: 'Partita IVA presente nella lista clienti' },
@@ -105,9 +105,9 @@ export default function Confronto({ aziende, lista, esiti, onCarica, onRimuovi }
               <FileUp size={15} /> {lista ? 'Sostituisci lista' : 'Carica lista clienti'}
             </button>
             {lista && (
-              <button className="btn" onClick={() => confirm('Rimuovere la lista clienti di questo dealer?') && onRimuovi()} title="Rimuovi lista">
+              <BottoneConferma title="Rimuovi lista" domanda="Rimuovi" onConferma={onRimuovi}>
                 <Trash2 size={15} />
-              </button>
+              </BottoneConferma>
             )}
           </div>
           <input ref={fileRef} type="file" accept=".xlsx,.csv" className="hidden" onChange={(e) => e.target.files?.[0] && carica(e.target.files[0])} />

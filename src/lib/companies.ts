@@ -1,5 +1,6 @@
 // Aziende della zona: da Openapi (a pagamento), da un file importato
 // (es. estrazione Telemaco) o dimostrative.
+import { DEMO } from './ambiente'
 import { categoriaDaAteco, type Flotta } from './categories'
 import { distanzaKm } from './geo'
 import type { Zona } from './zone'
@@ -106,6 +107,9 @@ export interface FiltriAcquisto {
 }
 
 async function post<T>(body: object, chiave: string): Promise<T> {
+  if (DEMO) {
+    return { demo: true, messaggio: "Nella demo online l'acquisto da Openapi è disattivato: funziona nella versione pubblicata su Vercel con il token. Qui usa i dati dimostrativi o importa un file." } as T
+  }
   const res = await fetch('/api/companies', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-app-key': chiave },

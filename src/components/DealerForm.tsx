@@ -1,19 +1,22 @@
 import { MapPin, Search } from 'lucide-react'
 import { useState } from 'react'
 import { geocodifica, type Dealer, type RisultatoGeocodifica } from '../lib/store'
-import { Avviso, Modale } from './ui'
+import { Avviso, BottoneConferma, Modale } from './ui'
 
-export function DealerForm({ iniziale, onSalva, onElimina, onClose }: {
+export function DealerForm({ iniziale, preset, onSalva, onElimina, onClose }: {
   iniziale?: Dealer
+  /** valori di partenza per un nuovo dealer (es. un punto esplorato sulla mappa) */
+  preset?: Partial<Dealer>
   onSalva: (d: Dealer) => void
   onElimina?: () => void
   onClose: () => void
 }) {
-  const [nome, setNome] = useState(iniziale?.nome ?? '')
-  const [indirizzo, setIndirizzo] = useState(iniziale?.indirizzo ?? '')
-  const [pos, setPos] = useState<{ lat: number; lon: number } | null>(iniziale ? { lat: iniziale.lat, lon: iniziale.lon } : null)
-  const [raggio, setRaggio] = useState(iniziale?.raggioKm ?? 15)
-  const [note, setNote] = useState(iniziale?.note ?? '')
+  const base = iniziale ?? preset
+  const [nome, setNome] = useState(base?.nome ?? '')
+  const [indirizzo, setIndirizzo] = useState(base?.indirizzo ?? '')
+  const [pos, setPos] = useState<{ lat: number; lon: number } | null>(base?.lat !== undefined && base?.lon !== undefined ? { lat: base.lat, lon: base.lon } : null)
+  const [raggio, setRaggio] = useState(base?.raggioKm ?? 15)
+  const [note, setNote] = useState(base?.note ?? '')
   const [risultati, setRisultati] = useState<RisultatoGeocodifica[]>([])
   const [errore, setErrore] = useState<string | null>(null)
   const [cerco, setCerco] = useState(false)
@@ -98,9 +101,9 @@ export function DealerForm({ iniziale, onSalva, onElimina, onClose }: {
         <div className="flex justify-between pt-2">
           <div>
             {onElimina && (
-              <button className="btn" style={{ color: 'var(--critical)' }} onClick={() => confirm('Eliminare questo dealer?') && onElimina()}>
+              <BottoneConferma style={{ color: 'var(--critical)' }} domanda="Sì, elimina" onConferma={onElimina}>
                 Elimina
-              </button>
+              </BottoneConferma>
             )}
           </div>
           <div className="flex gap-2">

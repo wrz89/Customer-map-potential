@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 
 export function Kpi({ label, valore, sotto, icona }: { label: string; valore: string; sotto?: string; icona?: ReactNode }) {
   return (
@@ -156,5 +156,37 @@ export function Modale({ titolo, onClose, children, largo }: { titolo: string; o
         <div className="p-5">{children}</div>
       </div>
     </div>
+  )
+}
+
+/** Pulsante a due tempi: il primo clic chiede conferma dentro la pagina, il secondo esegue. */
+export function BottoneConferma({ onConferma, children, domanda = 'Confermi?', className = 'btn', title, style }: {
+  onConferma: () => void
+  children: ReactNode
+  domanda?: string
+  className?: string
+  title?: string
+  style?: React.CSSProperties
+}) {
+  const [chiede, setChiede] = useState(false)
+  useEffect(() => {
+    if (!chiede) return
+    const t = setTimeout(() => setChiede(false), 4000)
+    return () => clearTimeout(t)
+  }, [chiede])
+  return (
+    <button
+      className={className}
+      title={title}
+      style={chiede ? { ...style, background: 'var(--critical)', borderColor: 'var(--critical)', color: '#fff' } : style}
+      onClick={() => {
+        if (chiede) {
+          setChiede(false)
+          onConferma()
+        } else setChiede(true)
+      }}
+    >
+      {chiede ? domanda : children}
+    </button>
   )
 }
