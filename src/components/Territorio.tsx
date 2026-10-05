@@ -76,7 +76,12 @@ function Concorrenza({ zona, dealer, chiaveApp, acquisti, onAggiornaOsm, onNuovo
       const lista = await importaElenco(file, zona)
       await onNuovoAcquisto(registra('import', lista, null))
       const nelRaggio = lista.filter((a) => a.lat !== null).length
-      setMsg({ tipo: 'ok', testo: `Importati ${lista.length} gommisti da ${file.name}: ${nelRaggio} sono in comuni della zona e compaiono al centro del loro comune.` })
+      setMsg({
+        tipo: 'ok',
+        testo:
+          `Importati ${lista.length} gommisti da ${file.name}: ${nelRaggio} sono in comuni della zona.` +
+          (zona.raggioKm <= 3 ? ` Con un raggio di ${distKm(zona.raggioKm)} cerco il loro indirizzo esatto, circa uno al secondo: compaiono in mappa man mano.` : ' Compaiono al centro del loro comune.'),
+      })
     } catch (e) {
       setMsg({ tipo: 'errore', testo: (e as Error).message })
     } finally {

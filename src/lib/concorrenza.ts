@@ -1,7 +1,7 @@
 // Concorrenza da OpenStreetMap, interrogata al momento per la zona aperta e
 // salvata nel browser per 30 giorni. Stesse regole di scripts/build_data.py.
 import { distanzaKm } from './geo'
-import type { Azienda } from './companies'
+import { inComune, type Azienda } from './companies'
 import type { Concorrente } from './zone'
 
 // Reti riconosciute dal nome o dal marchio; il gruppo solo dove l'appartenenza è certa
@@ -110,14 +110,18 @@ export async function caricaConcorrenzaOsm(lat: number, lon: number, raggioKm: n
 export const ATECO_GOMMISTI = ['452040']
 
 /** Gommisti dal Registro Imprese (Openapi o file Telemaco) come concorrenti. */
-export function daRegistro(aziende: Azienda[], lat: number, lon: number, raggioKm: number): Concorrente[] {
+/**
+ * Imprese del Registro come concorrenti. Quelle messe solo al centro del comune (elenchi senza coordinate)
+ * contano se il loro comune cade nella zona (`comuniZona`): la distanza dal centro del comune non dice nulla.
+ */
+export function daRegistro(aziende: Azienda[], lat: number, lon: number, raggioKm: number, comuniZona?: (comune: string) => boolean): Concorrente[] {
   const out: Concorrente[] = []
   for (const a of aziende) {
     if (a.lat === null || a.lon === null) continue
     const d = distanzaKm(lat, lon, a.lat, a.lon)
-    if (d > raggioKm) continue
+    if (inComune(a) ? comuniZona && !comuniZona(a.comune) : d > raggioKm) continue
     const c = classificaOfficina({ name: a.ragioneSociale })
-    out.push({ lat: a.lat, lon: a.lon, gommista: true, rete: c.rete, gruppo: c.gruppo, nome: a.ragioneSociale, distanzaKm: Math.round(d * 100) / 100, fonte: 'registro', indirizzo: [a.indirizzo, a.comune].filter(Boolean).join(', '), piva: a.piva, centroComune: a.fonte === 'import' })
+    out.push({ lat: a.lat, lon: a.lon, gommista: true, rete: c.rete, gruppo: c.gruppo, nome: a.ragioneSociale, distanzaKm: Math.round(d * 100) / 100, fonte: 'registro', indirizzo: [a.indirizzo, a.comune].filter(Boolean).join(', '), piva: a.piva, centroComune: inComune(a) })
   }
   return out.sort((x, y) => x.distanzaKm - y.distanzaKm)
 }

@@ -5,7 +5,7 @@ import type { GeoJSONSource, Map as MLMap, MapGeoJSONFeature } from 'maplibre-gl
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { Crosshair, Layers, Map as MapIcon, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Azienda } from '../lib/companies'
+import { inComune, type Azienda } from '../lib/companies'
 import { quotaVecchie } from '../lib/eta'
 import { distKm, n0 } from '../lib/fmt'
 import type { EsitoMatch, StatoMatch } from '../lib/match'
@@ -300,6 +300,8 @@ export default function MapView(props: Props) {
     const features = []
     for (const a of aziende) {
       if (a.lat === null || a.lon === null) continue
+      // al centro del comune e raggio piccolo il punto sarebbe fuori posto: compare quando ne trovo l'indirizzo
+      if (inComune(a) && (zona?.raggioKm ?? 15) < 3) continue
       const fl = a.flotta || 'n.d.'
       const st = esiti?.get(a.id)?.stato ?? 'Nuovo'
       if (!flotte[fl]) continue
@@ -320,7 +322,7 @@ export default function MapView(props: Props) {
     aziendeById.current = m
     return { aziendeFC: { type: 'FeatureCollection', features } as GeoJSON.FeatureCollection, visibiliAziende: features.length }
     // css() dipende dal tema: si ricalcola anche quando cambia
-  }, [aziende, esiti, flotte, stati, minDip, coloreStato, tema]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [aziende, esiti, flotte, stati, minDip, coloreStato, tema, zona?.raggioKm]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const concorrenzaFC = useMemo(() => {
     const catena = tema === 'dark' ? '#9085e9' : '#4a3aa7'

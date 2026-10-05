@@ -3,6 +3,7 @@
 import { DEMO } from './ambiente'
 import { categoriaDaAteco, type Flotta } from './categories'
 import { distanzaKm } from './geo'
+import { indiceComuni, trovaComune } from './importaDealer'
 import { indovinaColonne, leggiTabella, numero } from './leggiFile'
 import type { Zona } from './zone'
 
@@ -29,7 +30,14 @@ export interface Azienda {
   lon: number | null
   distanzaKm: number | null
   fonte: Fonte
+  /** 'comune': messa al centro del comune (elenchi senza coordinate); 'indirizzo': posizione trovata */
+  posizione?: 'indirizzo' | 'comune'
+  /** indirizzo già cercato in rete (trovato o no): non si riprova */
+  cercato?: boolean
 }
+
+/** Posizione solo al centro del comune: gli elenchi importati vecchi non avevano il campo e sono tutti così. */
+export const inComune = (a: Pick<Azienda, 'fonte' | 'posizione' | 'lat'>) => a.posizione === 'comune' || (a.fonte === 'import' && a.posizione === undefined && a.lat !== null)
 
 export function arricchisci(a: Omit<Azienda, 'categoria' | 'flotta' | 'distanzaKm'>, centro: { lat: number; lon: number }): Azienda {
   const cat = categoriaDaAteco(a.ateco)
@@ -37,7 +45,8 @@ export function arricchisci(a: Omit<Azienda, 'categoria' | 'flotta' | 'distanzaK
     ...a,
     categoria: cat?.nome ?? (a.ateco ? 'Altro' : 'Non classificata'),
     flotta: cat?.flotta ?? '',
-    distanzaKm: a.lat !== null && a.lon !== null ? Math.round(distanzaKm(centro.lat, centro.lon, a.lat, a.lon) * 10) / 10 : null,
+    // al centro del comune la distanza non vuol dire nulla
+    distanzaKm: a.lat !== null && a.lon !== null && !inComune(a) ? Math.round(distanzaKm(centro.lat, centro.lon, a.lat, a.lon) * 100) / 100 : null,
   }
 }
 
@@ -226,12 +235,18 @@ export async function importaElenco(file: File, zona: Zona): Promise<Azienda[]> 
   const { intestazioni, righe } = await leggiTabella(file)
   const m = indovinaColonne(intestazioni)
   if (!m.ragioneSociale) throw new Error(`Non trovo la colonna con la ragione sociale. Colonne lette: ${intestazioni.join(', ')}`)
-  const perNome = new Map(zona.comuni.map((z) => [z.comune.n.toUpperCase(), z.comune]))
+  const indice = indiceComuni(zona.comuni.map((z) => z.comune))
+  const colLat = intestazioni.find((h) => /^lat/i.test(h.trim()))
+  const colLon = intestazioni.find((h) => /^(lon|lng)/i.test(h.trim()))
   return righe
     .filter((r) => r[m.ragioneSociale!])
     .map((r, i) => {
       const comune = m.comune ? r[m.comune] : ''
-      const c = perNome.get(comune.toUpperCase())
+      const c = comune ? trovaComune({ citta: comune, provincia: m.provincia ? r[m.provincia] : '' }, indice) : null
+      // coordinate nel file: posizione esatta; altrimenti centro del comune, da affinare dopo
+      const latF = colLat ? numero(r[colLat]) : null
+      const lonF = colLon ? numero(r[colLon]) : null
+      const esatta = latF !== null && lonF !== null
       return arricchisci(
         {
           id: `imp-${file.name}-${i}`,
@@ -248,9 +263,11 @@ export async function importaElenco(file: File, zona: Zona): Promise<Azienda[]> 
           comune,
           provincia: m.provincia ? r[m.provincia] : (c?.p ?? ''),
           pec: m.pec ? r[m.pec] : '',
-          lat: c?.lat ?? null,
-          lon: c?.lon ?? null,
+          lat: esatta ? latF : (c?.lat ?? null),
+          lon: esatta ? lonF : (c?.lon ?? null),
           fonte: 'import',
+          posizione: esatta ? 'indirizzo' : c ? 'comune' : undefined,
+          cercato: esatta,
         },
         zona.centro,
       )

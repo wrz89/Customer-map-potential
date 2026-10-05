@@ -110,8 +110,10 @@ Openapi non chiarisce se gli 0,10 € valgono per ogni chiamata o per ogni azien
 ### Openapi: attivazione
 
 1. Registrati su console.openapi.com e attiva il servizio **Company**.
-2. Ricarica il portafoglio prepagato: carta, PayPal o bonifico, senza canone. C'è anche la ricarica automatica.
-3. Crea il token: nella console, sezione **Token**, scegli gli ambiti (scope) del servizio Company, almeno `IT-search` (oppure tutto `company.openapi.com`) e una scadenza, per esempio un anno. Il token è una lunga stringa: chi la possiede spende dal tuo portafoglio, quindi non va mandata per email né messa in file condivisi. Un token di prova (sandbox) si crea allo stesso modo nell'ambiente di test e non scala credito.
+2. Ricarica il portafoglio prepagato (carta, PayPal o bonifico): per i dati veri la ricarica minima può essere di 50 €, verifica nella tua console. Per provare non serve ricaricare: vedi il sandbox qui sotto.
+3. Crea il token: nella console, sezione **Authentication → + New Token**, scegli gli ambiti (scope) del servizio Company, almeno `IT-search` (oppure tutto `company.openapi.com`) e una scadenza, per esempio un anno. Il token è una lunga stringa: chi la possiede spende dal tuo portafoglio, quindi non va mandata per email né messa in file condivisi. 
+
+**Sandbox, gratuito, per provare tutto senza spendere:** nella console apri **Preferences (Preferenze) → scheda Sandbox**, inserisci i dati del cliente (persona o azienda), salva, poi assegna un credito di prova. Poi in **Authentication → + New Token** crea un token per l'ambiente di test. I dati restituiti sono finti. Fonte: documentazione di Openapi.
 4. App per PC: **Impostazioni → Openapi**, incolla il token e salva. Lascia spuntato "Ambiente di prova" finché non vuoi comprare dati veri.
    App locale con Python: incolla il token in `impostazioni.txt` alla riga `OPENAPI_TOKEN=`, lascia `OPENAPI_SANDBOX=1` per la prova e riavvia. Per i dati veri metti `OPENAPI_SANDBOX=0`.
 5. Nell'app: **Aziende → Stima costo → Acquista** per i clienti potenziali, **Territorio → Concorrenza → Stima con Openapi** per i gommisti.
@@ -122,7 +124,9 @@ Gli acquisti restano nel registro del dealer, così la stessa zona non si ricomp
 
 1. Su registroimprese.it, **Elenchi di imprese**: filtra per provincia e attività **45.20.40**, solo imprese attive.
 2. Scegli il formato **Indirizzi**. Il prezzo appare prima dell'acquisto.
-3. Scarica il CSV e caricalo in **Territorio → Concorrenza → Importa elenco Telemaco**. Ogni gommista compare al centro del suo comune.
+3. Scarica il CSV e caricalo in **Territorio → Concorrenza → Importa elenco Telemaco** (per i gommisti) oppure in **Aziende → Importa elenco Telemaco** (per i clienti potenziali).
+4. Il file deve avere almeno **Ragione Sociale** e **Comune**; il programma riconosce da solo Partita IVA, Indirizzo, CAP, Provincia, ATECO, Addetti, Fatturato, PEC. Se ci sono colonne **Lat** e **Lon** le usa come posizione esatta.
+5. Posizione: gli elenchi Telemaco non hanno coordinate, quindi all'inizio ogni impresa sta al centro del suo comune. Con un **raggio fino a 3 km** il programma cerca da solo l'indirizzo esatto delle imprese dei comuni nella zona, circa una al secondo, e le sposta; le altre restano fuori. Con raggi maggiori il centro del comune basta e non si cerca nulla. Compaiono in mappa man mano che vengono trovate.
 
 ## Da sapere sui dati
 

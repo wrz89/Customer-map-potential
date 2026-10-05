@@ -152,7 +152,7 @@ export function indiceComuni<T extends ComuneMinimo>(comuni: T[]): Map<string, T
 }
 
 /** Il comune della riga: per nome, e tra gli omonimi per provincia. */
-export function trovaComune<T extends ComuneMinimo>(r: RigaDealer, indice: Map<string, T[]>): T | null {
+export function trovaComune<T extends ComuneMinimo>(r: Pick<RigaDealer, 'citta' | 'provincia'>, indice: Map<string, T[]>): T | null {
   const tra = r.citta.match(/\(([A-Za-z]{2})\)\s*$/)
   const prov = (tra?.[1] ?? r.provincia).toUpperCase()
   let k = chiaveNome(r.citta.replace(/\([^)]*\)\s*$/, ''))

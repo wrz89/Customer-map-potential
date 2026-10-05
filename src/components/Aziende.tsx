@@ -94,7 +94,13 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
       const lista = await importaElenco(file, zona)
       await onNuovoAcquisto(nuovoAcquisto('import', lista, null))
       const senza = lista.filter((a) => a.lat === null).length
-      setInfo(`Importate ${lista.length} aziende da ${file.name}.${senza ? ` ${senza} senza comune riconosciuto nel raggio: compaiono in tabella ma non in mappa.` : ''}`)
+      const daCercare = lista.filter((a) => a.posizione === 'comune' && a.indirizzo.trim()).length
+      setInfo(
+        `Importate ${lista.length} aziende da ${file.name}.${senza ? ` ${senza} sono in comuni fuori dalla zona e non le conto.` : ''}` +
+          (zona.raggioKm <= 3 && daCercare
+            ? ` Con un raggio di ${distKm(zona.raggioKm)} cerco l'indirizzo esatto delle imprese dei comuni nella zona, circa una al secondo: compaiono in mappa e nelle distanze man mano.`
+            : ''),
+      )
     } catch (e) {
       setErrore((e as Error).message)
     } finally {

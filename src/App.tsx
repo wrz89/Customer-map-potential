@@ -26,7 +26,7 @@ import Territorio from './components/Territorio'
 import { Avviso, Kpi } from './components/ui'
 import type { Azienda } from './lib/companies'
 import { DEMO, salvaFile } from './lib/ambiente'
-import { generaDemo } from './lib/companies'
+import { generaDemo, inComune } from './lib/companies'
 import { caricaConcorrenzaOsm, daRegistro, unisciConcorrenti } from './lib/concorrenza'
 import { loadComuni, loadMeta, type Meta } from './lib/data'
 import { quotaVecchie } from './lib/eta'
@@ -50,7 +50,7 @@ import {
   type Dealer,
   type ListaClienti,
 } from './lib/store'
-import { affinaPosizione, rigaDaDealer } from './lib/importaDealer'
+import { affinaPosizione, chiaveNome, indiceComuni, rigaDaDealer } from './lib/importaDealer'
 import { calcolaZona, type Concorrente, type Zona } from './lib/zone'
 
 type Tab = 'mappa' | 'territorio' | 'settori' | 'aziende' | 'confronto'
@@ -168,12 +168,16 @@ export default function App() {
     if (zona && osm?.chiave !== chiaveZona) caricaOsm(zona)
   }, [zona, chiaveZona, osm?.chiave, caricaOsm])
 
+  // il comune di un'impresa è nella zona? (elenchi importati senza coordinate esatte)
+  const indiceZona = useMemo(() => (zona ? indiceComuni(zona.comuni.map((z) => z.comune)) : null), [zona])
+  const comuneInZona = useCallback((comune: string) => !indiceZona || indiceZona.has(chiaveNome(comune)), [indiceZona])
+
   const registro = useMemo(() => {
     if (!zona) return []
     const lista = acquisti.filter((a) => a.scopo === 'concorrenza').flatMap((a) => a.aziende)
     const unici = [...new Map(lista.map((a) => [a.piva || a.id, a])).values()]
-    return daRegistro(unici, zona.centro.lat, zona.centro.lon, zona.raggioKm)
-  }, [acquisti, zona])
+    return daRegistro(unici, zona.centro.lat, zona.centro.lon, zona.raggioKm, comuneInZona)
+  }, [acquisti, zona, comuneInZona])
 
   const zonaVista = useMemo<Zona | null>(() => {
     if (!zona) return null
@@ -257,6 +261,45 @@ export default function App() {
     }
   }, [prossimoDaAffinare?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Posizione esatta delle imprese importate (Telemaco): con raggi piccoli il centro del comune non basta.
+  // Solo le imprese dei comuni della zona, una al secondo, e solo dopo aver finito con i dealer.
+  const acquistiRef = useRef(acquisti)
+  acquistiRef.current = acquisti
+  const daLocalizzare = useMemo(() => {
+    if (DEMO || !zona || zona.raggioKm > 3 || daAffinare.length > 0) return []
+    const out: { acqId: string; aziendaId: string; a: Azienda }[] = []
+    for (const acq of acquisti)
+      for (const a of acq.aziende)
+        if (inComune(a) && !a.cercato && a.indirizzo.trim() && comuneInZona(a.comune)) out.push({ acqId: acq.id, aziendaId: a.id, a })
+    return out
+  }, [acquisti, zona, daAffinare.length, comuneInZona])
+  const prossimaAzienda = daLocalizzare[0]
+  const chiaveProssima = prossimaAzienda ? `${prossimaAzienda.acqId}|${prossimaAzienda.aziendaId}` : ''
+  useEffect(() => {
+    const p = prossimaAzienda
+    if (!p) return
+    let annullato = false
+    const t = setTimeout(async () => {
+      const riga = rigaDaDealer({ nome: p.a.ragioneSociale, via: p.a.indirizzo, cap: p.a.cap, citta: p.a.comune })
+      const pos = await affinaPosizione(riga, (q) => cercaPosizione(q).catch(() => null), giaCercata)
+      if (annullato) return
+      const acq = acquistiRef.current.find((x) => x.id === p.acqId)
+      if (!acq) return
+      const nuovo: Acquisto = {
+        ...acq,
+        aziende: acq.aziende.map((x) =>
+          x.id === p.aziendaId ? { ...x, ...(pos ? { lat: pos.lat, lon: pos.lon, posizione: 'indirizzo' as const } : { posizione: 'comune' as const }), cercato: true } : x,
+        ),
+      }
+      setAcquisti((prima) => prima.map((x) => (x.id === nuovo.id ? nuovo : x)))
+      salvaAcquisto(nuovo).catch(() => {})
+    }, 1100)
+    return () => {
+      annullato = true
+      clearTimeout(t)
+    }
+  }, [chiaveProssima]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // aziende del dealer: unione degli acquisti, senza doppioni, dentro il raggio attuale
   const aziende = useMemo(() => {
     if (!sel) return []
@@ -270,9 +313,15 @@ export default function App() {
       }
     }
     return [...m.values()]
-      .map((a) => (a.lat !== null && a.lon !== null && centro ? { ...a, distanzaKm: Math.round(distanzaKm(centro.lat, centro.lon, a.lat, a.lon) * 10) / 10 } : a))
-      .filter((a) => a.distanzaKm === null || a.distanzaKm <= raggio)
-  }, [acquisti, sel, centro?.lat, centro?.lon, raggio]) // eslint-disable-line react-hooks/exhaustive-deps
+      .map((a) => (a.lat !== null && a.lon !== null && centro && !inComune(a) ? { ...a, distanzaKm: Math.round(distanzaKm(centro.lat, centro.lon, a.lat, a.lon) * 100) / 100 } : a))
+      // posizione solo al centro del comune: conta se il comune è nella zona; altrimenti la distanza dal centro
+      .filter((a) => {
+        if (inComune(a)) return comuneInZona(a.comune)
+        // senza coordinate (comune non nella zona): fuori dal raggio
+        if (a.lat === null) return !a.comune || comuneInZona(a.comune)
+        return a.distanzaKm === null || a.distanzaKm <= raggio
+      })
+  }, [acquisti, sel, centro?.lat, centro?.lon, raggio, comuneInZona]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const esiti = useMemo(() => {
     const out = new Map<string, EsitoMatch>()
@@ -421,6 +470,11 @@ export default function App() {
               </div>
               <div className="ml-auto flex items-center gap-2">
                 {calcolo && <span className="text-xs" style={{ color: 'var(--muted)' }}>Calcolo…</span>}
+                {daLocalizzare.length > 0 && (
+                  <span className="text-xs" style={{ color: 'var(--muted)' }} title="Il servizio gratuito di ricerca indirizzi accetta una richiesta al secondo">
+                    Cerco la posizione di {daLocalizzare.length} imprese, circa {Math.max(1, Math.ceil(daLocalizzare.length / 50))} min…
+                  </span>
+                )}
                 <button className="btn btn-accent" onClick={esporta} disabled={!zona || esporto}>
                   <Download size={15} /> {esporto ? 'Preparo il file…' : 'Scarica Excel'}
                 </button>

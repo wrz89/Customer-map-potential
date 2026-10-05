@@ -58,3 +58,17 @@ describe('Registro Imprese come concorrenza', () => {
     expect(unisciConcorrenti([], [{ lat: 1, lon: 1, gommista: true, rete: '', gruppo: '', nome: 'X', distanzaKm: 1 }])).toHaveLength(1)
   })
 })
+
+describe('imprese importate al centro del comune', async () => {
+  const { daRegistro } = await import('../src/lib/concorrenza')
+  const base = { piva: '', ateco: '45.20.40', atecoDescr: '', categoria: '', flotta: '' as const, dipendenti: null, fatturato: null, annoBilancio: null, formaGiuridica: '', indirizzo: 'Via Roma 1', cap: '', provincia: '', pec: '', distanzaKm: null }
+  it('con un raggio piccolo contano se il comune è nella zona, non per distanza dal centro del comune', () => {
+    const a = { ...base, id: 'a', ragioneSociale: 'GOMME ROSSI', comune: 'PAVIA', lat: 45.07, lon: 9.2, fonte: 'import' as const, posizione: 'comune' as const }
+    const b = { ...base, id: 'b', ragioneSociale: 'GOMME BIANCHI', comune: 'LODI', lat: 45.31, lon: 9.5, fonte: 'import' as const, posizione: 'comune' as const }
+    const c = { ...base, id: 'c', ragioneSociale: 'GOMME VERDI', comune: 'PAVIA', lat: 45.185, lon: 9.158, fonte: 'import' as const, posizione: 'indirizzo' as const }
+    const lontano = { ...base, id: 'd', ragioneSociale: 'GOMME NERI', comune: 'PAVIA', lat: 45.3, lon: 9.4, fonte: 'import' as const, posizione: 'indirizzo' as const }
+    const r = daRegistro([a, b, c, lontano], 45.1847, 9.1582, 0.5, (comune) => comune === 'PAVIA')
+    expect(r.map((x) => x.nome).sort()).toEqual(['GOMME ROSSI', 'GOMME VERDI'])
+    expect(r.find((x) => x.nome === 'GOMME ROSSI')!.centroComune).toBe(true)
+  })
+})
