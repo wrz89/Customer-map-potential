@@ -17,7 +17,9 @@ export interface PacchettoAteco {
   nome: string
   flotta: Flotta
   perche: string
-  /** da quanti addetti conviene comprare: 0 = tutte, 1 = 10 e oltre, 2 = 50 e oltre */
+  /** avvertenza mostrata sotto la descrizione */
+  nota?: string
+  /** taglia minima consigliata, modificabile: 0 = tutte, 1 = 10 e oltre, 2 = 50 e oltre */
   soglia: 0 | 1 | 2
   voci: VoceAteco[]
 }
@@ -56,43 +58,57 @@ export const PACCHETTI_ATECO: PacchettoAteco[] = [
     voci: [div('45', 'Commercio e riparazione di autoveicoli e moto, ricambi, autolavaggi (esclusi i gommisti 45.20.40)')],
   },
   {
-    id: 'flotta-media',
-    nome: 'Flotta media: serve la taglia',
+    id: 'professionisti',
+    nome: 'Professionisti e studi',
     flotta: 'Media',
-    perche: 'Agenti, tecnici e consegne: hanno flotte, ma solo le imprese con almeno 10 addetti ne hanno una vera.',
+    perche: 'Avvocati, commercialisti, ingegneri e architetti, geometri, medici, veterinari, agenti: pochi dipendenti ma auto per le visite. Per questo la taglia minima è 0.',
+    nota: 'Molti liberi professionisti stanno negli albi e non nel Registro Imprese: su Telemaco compaiono solo società e ditte, quindi una parte degli studi manca.',
+    soglia: 0,
+    voci: [
+      div('69', 'Studi legali, commercialisti, consulenti del lavoro, contabilità'),
+      div('70', 'Consulenza gestionale e direzione aziendale'),
+      div('71', 'Ingegneri, architetti, geometri, collaudi e analisi tecniche'),
+      div('73', 'Pubblicità e ricerche di mercato'),
+      div('74', 'Altre attività professionali: design, fotografi, periti'),
+      div('75', 'Veterinari'),
+      { codice: '86.2', nome: 'Studi medici e dentistici' },
+      { codice: '66.2', nome: 'Agenti e mediatori di assicurazione' },
+      { codice: '68.3', nome: 'Agenzie immobiliari e amministratori di condominio' },
+    ],
+  },
+  {
+    id: 'commercio',
+    nome: 'Commercio, anche misto',
+    flotta: 'Media',
+    perche: 'Negozi, ingrosso, agenti, commercio non specializzato (merceologie miste): consegne, rappresentanti e auto per gli addetti. Sono tantissimi: serve una taglia minima.',
+    soglia: 1,
+    voci: [div('47', 'Commercio al dettaglio, anche non specializzato e ambulante'), div('46', "Commercio all'ingrosso e agenti di commercio")],
+  },
+  {
+    id: 'industria-servizi',
+    nome: 'Industria e altri servizi',
+    flotta: 'Media',
+    perche: 'Manifattura, agricoltura, energia, sanità, alberghi, istruzione, finanza, servizi: ogni impresa con dipendenti ha auto, ma solo da una certa taglia conviene.',
     soglia: 1,
     voci: [
-      div('46', "Commercio all'ingrosso: agenti, distribuzione"),
+      div('01', 'Agricoltura: aziende agricole e contoterzisti'),
       div('33', 'Riparazione e installazione di macchine: tecnici in furgone'),
       div('35', 'Energia elettrica e gas'),
       div('36', 'Acqua'),
       div('37', 'Reti fognarie'),
+      div('55', 'Alberghi'),
+      div('56', 'Ristorazione'),
+      div('62', 'Software e consulenza informatica'),
+      div('63', 'Servizi di informazione'),
+      div('64', 'Servizi finanziari'),
+      div('65', 'Assicurazioni'),
+      div('68', 'Immobiliare'),
+      div('85', 'Istruzione'),
       div('86', 'Sanità'),
       div('87', 'Assistenza residenziale'),
       div('88', 'Assistenza sociale non residenziale: assistenza domiciliare'),
-      { codice: '01', nome: 'Agricoltura: aziende agricole e contoterzisti', intera: true },
-      ...range(10, 32).map((c) => div(c, c === '10' ? 'Manifattura: da 10 a 32, tutte le industrie' : `Manifattura ${c}`)),
-    ],
-  },
-  {
-    id: 'auto-commerciali',
-    nome: 'Auto per commerciali e tecnici',
-    flotta: 'Bassa',
-    perche: 'Auto aziendali date ai dipendenti: solo le imprese grandi (50 addetti e oltre) hanno abbastanza auto da fare una convenzione.',
-    soglia: 2,
-    voci: [
-      div('47', 'Commercio al dettaglio'),
-      div('62', 'Software e consulenza informatica'),
-      div('63', 'Servizi di informazione'),
-      ...range(69, 74).map((c) => div(c, `Servizi professionali ${c}`)),
-      div('64', 'Servizi finanziari'),
-      div('65', 'Assicurazioni'),
-      div('66', 'Ausiliarie finanziarie'),
-      div('68', 'Immobiliare'),
-      div('55', 'Alberghi'),
-      div('56', 'Ristorazione'),
-      div('85', 'Istruzione'),
       ...range(90, 96).map((c) => div(c, `Servizi ${c}`)),
+      ...range(10, 32).map((c) => div(c, c === '10' ? 'Manifattura: da 10 a 32, tutte le industrie' : `Manifattura ${c}`)),
     ],
   },
 ]
@@ -104,13 +120,13 @@ export const codiciPacchetti = (ids: string[]): string[] =>
   [...new Set(PACCHETTI_ATECO.filter((p) => ids.includes(p.id)).flatMap((p) => p.voci.map((v) => v.codice)))]
 
 /** Imprese attese in una zona per un pacchetto, dai dati ISTAT per divisione (solo le divisioni intere). */
-export function stimaPacchetto(zona: Zona, p: PacchettoAteco): { imprese: number; parziale: boolean } {
+export function stimaPacchetto(zona: Zona, p: PacchettoAteco, soglia: 0 | 1 | 2 = p.soglia): { imprese: number; parziale: boolean } {
   const divisioni = new Set(p.voci.filter((v) => v.intera).map((v) => v.codice))
   let imprese = 0
   for (const s of zona.settori) {
     if (!divisioni.has(s.divisione)) continue
     // ulClassi: 0-9, 10-49, 50-249, 250+
-    imprese += s.ulClassi.slice(p.soglia === 0 ? 0 : p.soglia === 1 ? 1 : 2).reduce((a, b) => a + b, 0)
+    imprese += s.ulClassi.slice(soglia === 0 ? 0 : soglia === 1 ? 1 : 2).reduce((a, b) => a + b, 0)
   }
   return { imprese, parziale: p.voci.some((v) => !v.intera) }
 }

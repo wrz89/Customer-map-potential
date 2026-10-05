@@ -94,16 +94,23 @@ describe('guida Telemaco: codici e stima per zona', async () => {
     expect(tutti).toContain('45')
     expect(tutti).not.toContain('45.20.40')
   })
-  it('stima le imprese dai dati ISTAT con la soglia di addetti del pacchetto', async () => {
+  it('stima le imprese dai dati ISTAT con la taglia minima scelta', async () => {
     const z = await calcolaZona(45.1847, 9.1582, 5)
-    const [mestiere, auto, media, commerciali] = PACCHETTI_ATECO.map((p) => stimaPacchetto(z, p))
-    expect(mestiere.imprese).toBeGreaterThan(auto.imprese)
-    expect(mestiere.parziale).toBe(true) // 77.1, 85.53, 56.2 non contano nella stima
-    expect(auto.parziale).toBe(false)
-    // soglia 10+ e 50+: meno imprese che con tutte
-    const tutteMedia = z.settori.filter((s) => ['46', '33', '35', '86'].includes(s.divisione)).reduce((a, s) => a + s.unitaLocali, 0)
-    expect(media.imprese).toBeLessThan(tutteMedia + 1)
-    expect(commerciali.imprese).toBeGreaterThanOrEqual(0)
+    const per = (id: string, soglia?: 0 | 1 | 2) => stimaPacchetto(z, PACCHETTI_ATECO.find((p) => p.id === id)!, soglia)
+    expect(per('flotta-mestiere').imprese).toBeGreaterThan(per('lavora-con-auto').imprese)
+    expect(per('flotta-mestiere').parziale).toBe(true) // 77.1, 85.53, 56.2 non contano nella stima
+    expect(per('lavora-con-auto').parziale).toBe(false)
+    // i professionisti sono piccoli: con taglia 0 sono molti di più che con 10+
+    expect(per('professionisti', 0).imprese).toBeGreaterThan(per('professionisti', 1).imprese * 2)
+    expect(per('professionisti', 1).imprese).toBeGreaterThanOrEqual(per('professionisti', 2).imprese)
+    // lo stesso pacchetto con soglia diversa da quella consigliata
+    expect(per('commercio', 0).imprese).toBeGreaterThan(per('commercio').imprese)
+  })
+  it('avvocati e commercialisti (69) sono nel pacchetto dei professionisti senza taglia minima', () => {
+    const p = PACCHETTI_ATECO.find((x) => x.id === 'professionisti')!
+    expect(p.soglia).toBe(0)
+    expect(p.voci.map((v) => v.codice)).toContain('69')
+    expect(p.nota).toMatch(/albi/)
   })
   it('costo: 5 € a elenco più per impresa, zero se non ce ne sono', () => {
     expect(costoTelemaco(100, 'indirizzi')).toBeCloseTo(7)
