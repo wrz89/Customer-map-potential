@@ -14,7 +14,7 @@
     "pacchetto": "npm run build && python3 scripts/pacchetto.py",
     "desktop:prepara": "tsc server/openapi.ts --ignoreConfig --ignoreDeprecations 6.0 --module commonjs --target es2022 --moduleResolution node --skipLibCheck --outDir desktop/build && node -e \"require('fs').renameSync('desktop/build/openapi.js','desktop/build/openapi.cjs')\"",
     "desktop": "npm run build && npm run desktop:prepara && electron .",
-    "installer": "npm run build && npm run desktop:prepara && electron-builder --win --x64"
+    "installer": "npm run build && npm run desktop:prepara && electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
