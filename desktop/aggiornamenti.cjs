@@ -1,7 +1,7 @@
 // Aggiornamento automatico dalle release GitHub della repo.
 // - Versione installata (Setup): electron-updater scarica in background e installa alla chiusura.
 // - Versione portatile (zip): scarica il nuovo .exe accanto a quello in uso e lo sostituisce al riavvio.
-// Nessun token: la repo dei download è pubblica e si legge solo la release più recente.
+// Nessun token: la repo è pubblica e si legge solo la release più recente.
 const { app, dialog, net, shell, BrowserWindow } = require('electron')
 const { spawn } = require('node:child_process')
 const crypto = require('node:crypto')
@@ -9,8 +9,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 
-// il codice è in una repo privata: versioni pubblicate in una repo pubblica con i soli file da scaricare
-const REPO = 'wrz89/customer-map-potential-download'
+const REPO = 'wrz89/Customer-map-potential'
 const PAGINA = `https://github.com/${REPO}/releases/latest`
 const ASSET_PORTATILE = 'Customer-Map-Potential-Portable.exe'
 const OGNI = 6 * 60 * 60 * 1000
