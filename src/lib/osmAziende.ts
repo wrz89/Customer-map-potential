@@ -5,6 +5,7 @@
 import { CATEGORIE, type Flotta } from './categories'
 import type { Azienda } from './companies'
 import { distanzaKm } from './geo'
+import { bbox, interrogaOverpass, type OpzioniOverpass } from './overpass'
 
 export interface ElementoOsm {
   type?: string
@@ -18,12 +19,6 @@ export interface ElementoOsm {
 /** Oltre questo raggio le risposte diventano enormi (decine di migliaia di punti): si lavora a zone. */
 export const RAGGIO_MAX_OSM_KM = 5
 
-const SERVER = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-]
-
 const AMENITY =
   'restaurant|cafe|bar|pub|fast_food|ice_cream|food_court|bank|pharmacy|clinic|doctors|dentist|veterinary|car_rental|car_sharing|car_wash|fuel|driving_school|school|kindergarten|college|university|language_school|music_school|post_office|nursing_home|social_facility|coworking_space|funeral_hall|laboratory|childcare|townhall|courthouse|community_centre'
 const TURISMO = 'hotel|guest_house|hostel|motel|apartment|camp_site|caravan_site'
@@ -32,9 +27,9 @@ const EDIFICI = 'industrial|warehouse|factory|commercial|retail|office'
 
 /** Query Overpass: solo elementi con nome, dentro il raggio. I gommisti restano alla scheda Concorrenza. */
 export function queryAttivita(lat: number, lon: number, raggioKm: number): string {
-  const a = `(around:${Math.round(raggioKm * 1000)},${lat},${lon})`
+  const a = ''
   const n = '["name"]'
-  return `[out:json][timeout:150];(
+  return `[out:json][timeout:150][bbox:${bbox(lat, lon, raggioKm)}];(
 nwr["shop"]${n}${a};
 nwr["office"]${n}${a};
 nwr["craft"]${n}${a};
@@ -185,30 +180,9 @@ export interface RisultatoAttivita {
   ricevuti: number
 }
 
-export async function cercaAttivitaOsm(
-  lat: number,
-  lon: number,
-  raggioKm: number,
-  http: typeof fetch = fetch,
-  server: string[] = SERVER,
-): Promise<RisultatoAttivita> {
+export async function cercaAttivitaOsm(lat: number, lon: number, raggioKm: number, opz: OpzioniOverpass = {}): Promise<RisultatoAttivita> {
   if (raggioKm > RAGGIO_MAX_OSM_KM) throw new Error(`Con OpenStreetMap il raggio massimo è ${RAGGIO_MAX_OSM_KM} km: oltre, la risposta è troppo grande. Restringi il raggio o lavora a zone.`)
-  const q = queryAttivita(lat, lon, raggioKm)
-  let ultimoErrore = ''
-  for (const url of server) {
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 170000)
-      const res = await http(url, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctrl.signal })
-      clearTimeout(t)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const j = (await res.json()) as { elements?: ElementoOsm[]; remark?: string }
-      if (j.remark && /timed out|out of memory|runtime error/i.test(j.remark)) throw new Error('il server è sovraccarico')
-      const el = j.elements ?? []
-      return { aziende: convertiAttivita(el, { lat, lon }, raggioKm), ricevuti: el.length }
-    } catch (e) {
-      ultimoErrore = (e as Error).name === 'AbortError' ? 'tempo scaduto' : (e as Error).message
-    }
-  }
-  throw new Error(`OpenStreetMap non risponde (${ultimoErrore}). Riprova tra qualche minuto, o con un raggio più piccolo.`)
+  const j = await interrogaOverpass<{ elements?: ElementoOsm[] }>(queryAttivita(lat, lon, raggioKm), { scadenzaMs: 170000, ...opz })
+  const el = j.elements ?? []
+  return { aziende: convertiAttivita(el, { lat, lon }, raggioKm), ricevuti: el.length }
 }

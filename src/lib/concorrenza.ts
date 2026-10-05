@@ -1,6 +1,7 @@
 // Concorrenza da OpenStreetMap, interrogata al momento per la zona aperta e
 // salvata nel browser per 30 giorni. Stesse regole di scripts/build_data.py.
 import { distanzaKm } from './geo'
+import { bbox, interrogaOverpass, type OpzioniOverpass } from './overpass'
 import { inComune, type Azienda } from './companies'
 import type { Concorrente } from './zone'
 
@@ -29,11 +30,6 @@ export function classificaOfficina(tags: Record<string, string>): { gommista: bo
   return { gommista, rete: r?.[0] ?? '', gruppo: r?.[1] ?? '' }
 }
 
-const SERVER = [
-  'https://overpass-api.de/api/interpreter',
-  'https://overpass.private.coffee/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-]
 const GIORNI_VALIDITA = 30
 
 interface ElementoOsm {
@@ -119,32 +115,27 @@ function dallaMemoria(lat: number, lon: number, raggioKm: number): RisultatoConc
 }
 
 /** Officine mappate in OpenStreetMap: gratis, copertura parziale. Salvate 30 giorni. */
-export async function caricaConcorrenzaOsm(lat: number, lon: number, raggioKm: number, forza = false, http: typeof fetch = fetch): Promise<RisultatoConcorrenza> {
+export async function caricaConcorrenzaOsm(lat: number, lon: number, raggioKm: number, forza = false, opz: OpzioniOverpass = {}): Promise<RisultatoConcorrenza> {
   if (!forza) {
     const c = dallaMemoria(lat, lon, raggioKm)
     if (c) return c
   }
-  const rc = raggioDaCaricare(raggioKm)
-  const m = Math.round(rc * 1000)
-  const q = `[out:json][timeout:90];(nwr["shop"="tyres"](around:${m},${lat},${lon});nwr["shop"="car_repair"](around:${m},${lat},${lon});nwr["craft"="car_repair"](around:${m},${lat},${lon});nwr["craft"="tyres"](around:${m},${lat},${lon}););out center tags;`
-  let ultimoErrore = ''
-  for (const url of SERVER) {
+  // prima l'area larga (serve a non rifare la richiesta se il centro si sposta); se i server faticano, solo quella chiesta
+  const raggi = [raggioDaCaricare(raggioKm)]
+  if (raggi[0] > raggioKm) raggi.push(raggioKm)
+  let ultimoErrore: unknown
+  for (const rc of raggi) {
+    const q = `[out:json][timeout:60][bbox:${bbox(lat, lon, rc)}];(nwr["shop"="tyres"];nwr["shop"="car_repair"];nwr["craft"="car_repair"];nwr["craft"="tyres"];);out center tags;`
     try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 70000)
-      const res = await http(url, { method: 'POST', body: new URLSearchParams({ data: q }), signal: ctrl.signal })
-      clearTimeout(t)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const j = (await res.json()) as { elements: ElementoOsm[]; remark?: string }
-      if (j.remark && /timed out|out of memory|runtime error/i.test(j.remark)) throw new Error('il server è sovraccarico')
-      const r: RisultatoConcorrenza = { concorrenti: convertiElementi(j.elements, lat, lon, rc), data: new Date().toISOString(), daCache: false, fonte: 'osm', area: { lat, lon, raggioKm: rc } }
+      const j = await interrogaOverpass<{ elements: ElementoOsm[] }>(q, { giri: rc === raggi[0] && raggi.length > 1 ? 1 : 2, ...opz })
+      const r: RisultatoConcorrenza = { concorrenti: convertiElementi(j.elements ?? [], lat, lon, rc), data: new Date().toISOString(), daCache: false, fonte: 'osm', area: { lat, lon, raggioKm: rc } }
       salva(chiave(lat, lon, rc), r)
       return r
     } catch (e) {
-      ultimoErrore = (e as Error).name === 'AbortError' ? 'tempo scaduto' : (e as Error).message
+      ultimoErrore = e
     }
   }
-  throw new Error(`OpenStreetMap non risponde (${ultimoErrore}). Riprova tra qualche minuto.`)
+  throw ultimoErrore as Error
 }
 
 /** ATECO 45.20.40: riparazione e sostituzione di pneumatici (gommisti iscritti al Registro Imprese) */

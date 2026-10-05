@@ -41,23 +41,23 @@ describe('attività da OpenStreetMap', () => {
 
   it('la query chiede solo elementi con nome, nel raggio, e il limite è 5 km', async () => {
     const q = queryAttivita(45.4642, 9.19, 0.5)
-    expect(q).toContain('around:500,45.4642,9.19')
+    expect(q).toMatch(/\[bbox:45\.459\d+,9\.18\d+,45\.468\d+,9\.19\d+\]/)
     expect(q).toContain('["shop"]["name"]')
     expect(q).toContain('["office"]["name"]')
     await expect(cercaAttivitaOsm(45, 9, RAGGIO_MAX_OSM_KM + 1)).rejects.toThrow(/raggio massimo/)
   })
 
-  it('prova il server successivo se il primo non risponde', async () => {
+  it('prova il server successivo e poi ripete il giro', async () => {
     const chiamati: string[] = []
     const http = (async (url: string) => {
       chiamati.push(url)
-      if (chiamati.length === 1) return new Response('', { status: 429 })
+      if (chiamati.length < 4) return new Response('', { status: 504 })
       return new Response(JSON.stringify({ elements: [nodo(1, 45.4645, 9.1903, { name: 'Studio Rossi', office: 'lawyer' })] }), { status: 200 })
     }) as unknown as typeof fetch
-    const r = await cercaAttivitaOsm(45.4642, 9.19, 1, http, ['https://uno', 'https://due'])
-    expect(chiamati).toEqual(['https://uno', 'https://due'])
+    const r = await cercaAttivitaOsm(45.4642, 9.19, 1, { http, server: ['https://uno', 'https://due'], pausaMs: 0 })
+    expect(chiamati).toEqual(['https://uno', 'https://due', 'https://uno', 'https://due'])
     expect(r.aziende).toHaveLength(1)
     expect(r.ricevuti).toBe(1)
-    await expect(cercaAttivitaOsm(45, 9, 1, (async () => new Response('', { status: 504 })) as unknown as typeof fetch, ['https://uno'])).rejects.toThrow(/non risponde.*HTTP 504/)
+    await expect(cercaAttivitaOsm(45, 9, 1, { http: (async () => new Response('', { status: 504 })) as unknown as typeof fetch, server: ['https://uno'], pausaMs: 0 })).rejects.toThrow(/sovraccarico \(HTTP 504\)/)
   })
 })
