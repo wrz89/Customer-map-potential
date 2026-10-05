@@ -31,7 +31,20 @@ Sulla **mappa** si può:
 
 La cernita nell'Excel funziona senza macro. Abbina per partita IVA, poi per nome uguale a meno di forma giuridica, punteggiatura e spazi. Il confronto dentro l'app è più fine: riconosce anche nomi scritti in modo diverso e lo stesso indirizzo.
 
-## Avvio in locale
+## App locale da scaricare (consigliata)
+
+Il pacchetto `CustomerMapPotential.zip` contiene tutto: l'app compilata, i dati e un piccolo server in Python.
+
+1. Serve Python 3, lo stesso dell'ufficio trading. Se manca: python.org, spuntando "Add Python to PATH".
+2. Estrai lo zip in una cartella, per esempio `Documenti\CustomerMapPotential`.
+3. Doppio clic su **Avvia Customer Map.bat**. Si apre il browser su http://localhost:8790.
+4. Per acquistare i nominativi, apri `impostazioni.txt` con il Blocco note e incolla il token Openapi.
+
+L'app risponde solo dal PC su cui gira: dagli altri computer della rete non si raggiunge. Il token resta in `impostazioni.txt`.
+
+Per rifare il pacchetto dopo una modifica: `npm run pacchetto`. Il file finisce in `pacchetto/`.
+
+## Avvio per sviluppo
 
 Serve Node.js 20 o superiore.
 

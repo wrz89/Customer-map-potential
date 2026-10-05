@@ -71,7 +71,7 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
         <div>
           <div className="font-bold">Password dell'app</div>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
-            Serve per stimare e acquistare i nominativi: protegge il credito Openapi. È quella impostata come APP_PASSWORD su Vercel.
+            Serve solo se hai impostato APP_PASSWORD: nel file impostazioni.txt dell'app locale, o su Vercel. Protegge il credito Openapi.
           </p>
           <div className="mt-2 flex gap-2">
             <input className="input" type="password" value={chiave} onChange={(e) => setChiave(e.target.value)} placeholder="Password" />

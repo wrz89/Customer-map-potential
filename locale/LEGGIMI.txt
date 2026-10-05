@@ -1,0 +1,28 @@
+CUSTOMER MAP POTENTIAL - app locale
+===================================
+
+AVVIO
+1. Serve Python 3 (lo stesso dell'ufficio trading va bene).
+   Se manca: https://www.python.org/downloads/ e spunta "Add Python to PATH".
+2. Doppio clic su "Avvia Customer Map.bat".
+3. Si apre il browser su http://localhost:8790
+   Tieni aperta la finestra nera finché usi l'app; chiudila per spegnerla.
+
+DATI
+- Comuni, veicoli e settori sono già dentro il pacchetto (ISTAT e ACI-PRA).
+- Dealer, aziende acquistate e liste clienti restano nel browser di questo PC.
+  Usa sempre lo stesso browser. Per spostarli su un altro PC: Impostazioni > Esporta.
+- Serve internet solo per la mappa stradale di sfondo, la ricerca indirizzi e Openapi.
+
+ACQUISTO NOMINATIVI
+- Apri impostazioni.txt con il Blocco note e incolla il token Openapi.
+- Prova prima con OPENAPI_SANDBOX=1, poi metti 0 per i dati veri.
+- Riavvia l'app dopo ogni modifica.
+
+SICUREZZA
+- L'app risponde solo da questo PC: dagli altri computer della rete non si raggiunge.
+- Il token resta in impostazioni.txt e non passa dal browser.
+
+AGGIORNAMENTO
+- Scarica il nuovo pacchetto e sostituisci la cartella "app".
+  impostazioni.txt e i dati nel browser restano.

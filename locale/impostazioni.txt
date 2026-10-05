@@ -1,0 +1,12 @@
+# Impostazioni di Customer Map Potential. Modifica con il Blocco note, poi riavvia l'app.
+# Questo file resta sul tuo PC: non mandarlo a nessuno, contiene il token.
+
+# Token Openapi (console.openapi.com, servizio Company, accesso a IT-search).
+# Vuoto = l'app funziona con aziende dimostrative.
+OPENAPI_TOKEN=
+
+# 1 = ambiente di prova di Openapi, senza costi. Metti 0 per i dati veri.
+OPENAPI_SANDBOX=1
+
+# Facoltativa: se la imposti, l'app la chiede prima di stimare o acquistare.
+APP_PASSWORD=

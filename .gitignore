@@ -30,3 +30,4 @@ data/raw/
 !.env.example
 !.env.demo
 dist-demo
+pacchetto/
