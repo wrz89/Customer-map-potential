@@ -1,6 +1,6 @@
 import { Download, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { desktop, type StatoDesktop } from '../lib/ambiente'
+import { desktop, type StatoAggiornamento, type StatoDesktop } from '../lib/ambiente'
 import { indovinaColonne, leggiTabella, numero } from '../lib/leggiFile'
 import { geocodifica, type Dealer, type Impostazioni as Imp } from '../lib/store'
 import { Avviso, Modale } from './ui'
@@ -70,6 +70,7 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
     <Modale titolo="Impostazioni" onClose={onClose}>
       <div className="space-y-5 text-sm">
         {desktop && <OpenapiDesktop />}
+        {desktop?.verificaAggiornamenti && <Aggiornamenti />}
         {!desktop && <div>
           <div className="font-bold">Password dell'app</div>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
@@ -160,6 +161,48 @@ function OpenapiDesktop() {
       )}
       {msg && <div className="mt-2"><Avviso tipo="ok">{msg}</Avviso></div>}
       <div className="mt-3 text-[11px]" style={{ color: 'var(--muted)' }}>Versione {stato.versione} · dati in {stato.cartellaDati}</div>
+    </div>
+  )
+}
+
+function Aggiornamenti() {
+  const [s, setS] = useState<StatoAggiornamento | null>(null)
+  useEffect(() => {
+    desktop?.statoAggiornamento?.().then(setS)
+    return desktop?.seguiAggiornamento?.(setS)
+  }, [])
+  if (!s) return null
+  const testo: Record<StatoAggiornamento['fase'], string> = {
+    inattivo: 'Controllo automatico all\'avvio e ogni 6 ore',
+    verifica: 'Controllo in corso…',
+    aggiornato: 'Hai l\'ultima versione',
+    download: `Scarico la versione ${s.nuova ?? ''}… ${s.percentuale}%`,
+    pronto: `Versione ${s.nuova} pronta: si installa al riavvio`,
+    errore: s.messaggio || 'Controllo non riuscito',
+  }
+  return (
+    <div>
+      <div className="font-bold">Aggiornamenti</div>
+      <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
+        Il programma scarica da solo le nuove versioni pubblicate sulla repo GitHub. Dealer, acquisti e liste clienti restano dove sono.
+      </p>
+      <div className="mt-2 text-xs">
+        Versione {s.versione} · <b style={{ color: s.fase === 'errore' ? 'var(--warn)' : s.fase === 'pronto' ? 'var(--good-ink)' : undefined }}>{testo[s.fase]}</b>
+      </div>
+      {s.fase === 'download' && (
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full" style={{ background: 'var(--line)' }}>
+          <div className="h-full" style={{ width: `${s.percentuale}%`, background: 'var(--accent)' }} />
+        </div>
+      )}
+      <div className="mt-2 flex gap-2">
+        {s.fase === 'pronto' ? (
+          <button className="btn btn-primary !py-1 text-xs" onClick={() => desktop!.installaAggiornamento!()}>Riavvia e aggiorna</button>
+        ) : (
+          <button className="btn !py-1 text-xs" disabled={s.fase === 'verifica' || s.fase === 'download'} onClick={() => desktop!.verificaAggiornamenti!()}>
+            Verifica ora
+          </button>
+        )}
+      </div>
     </div>
   )
 }

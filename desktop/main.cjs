@@ -7,6 +7,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 const { gestisci } = require('./build/openapi.cjs')
+const aggiornamenti = require('./aggiornamenti.cjs')
 
 const SCHEMA = 'app'
 const HOST = 'customer-map'
@@ -179,6 +180,9 @@ function menu() {
     {
       label: 'Aiuto',
       submenu: [
+        { label: 'Verifica aggiornamenti…', click: () => aggiornamenti.verifica(true) },
+        { label: 'Pagina dei download', click: () => shell.openExternal(aggiornamenti.PAGINA) },
+        { type: 'separator' },
         {
           label: 'Informazioni',
           click: () =>
@@ -211,6 +215,7 @@ if (!app.requestSingleInstanceLock()) {
     protocol.handle(SCHEMA, gestisciRichiesta)
     ipcMain.handle('impostazioni:leggi', () => statoImpostazioni())
     ipcMain.handle('impostazioni:salva', (_e, v) => salvaImpostazioni(v || {}))
+    aggiornamenti.avvia(ipcMain)
     menu()
     finestra = creaFinestra()
   })

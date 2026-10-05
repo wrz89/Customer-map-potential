@@ -35,9 +35,21 @@ export interface StatoDesktop {
   cartellaDati: string
 }
 
+export interface StatoAggiornamento {
+  fase: 'inattivo' | 'verifica' | 'aggiornato' | 'download' | 'pronto' | 'errore'
+  versione: string
+  nuova: string | null
+  percentuale: number
+  messaggio: string
+}
+
 interface DesktopApi {
   leggiImpostazioni: () => Promise<StatoDesktop>
   salvaImpostazioni: (v: { token?: string; sandbox?: boolean }) => Promise<StatoDesktop>
+  statoAggiornamento?: () => Promise<StatoAggiornamento>
+  verificaAggiornamenti?: () => Promise<StatoAggiornamento>
+  installaAggiornamento?: () => Promise<void>
+  seguiAggiornamento?: (cb: (s: StatoAggiornamento) => void) => () => void
 }
 
 /** Presente solo dentro l'applicazione per PC. */

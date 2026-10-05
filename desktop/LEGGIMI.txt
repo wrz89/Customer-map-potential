@@ -12,6 +12,14 @@ AVVIO
 Preferisci installarlo con icona sul desktop e nel menu Start?
 Scarica dalla stessa pagina "Customer-Map-Potential-Setup.exe".
 
+AGGIORNAMENTI
+- Il programma si aggiorna da solo: all'avvio (e ogni 6 ore) controlla
+  se c'è una versione nuova, la scarica e la installa al riavvio.
+- Versione portatile: lascia l'exe in una cartella dove puoi scrivere
+  (Documenti, Desktop), non in Programmi, altrimenti non può sostituirsi.
+- Controllo manuale: menu Aiuto > Verifica aggiornamenti.
+- Dealer, acquisti e liste clienti non vengono toccati.
+
 PRIMI PASSI
 - Impostazioni > Elenco dealer > Importa: un Excel con colonne Nome e Indirizzo.
 - Impostazioni > Openapi: incolla il token per acquistare i nominativi.

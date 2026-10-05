@@ -51,6 +51,7 @@
       "dist/**/*",
       "desktop/main.cjs",
       "desktop/preload.cjs",
+      "desktop/aggiornamenti.cjs",
       "desktop/build/**/*",
       "desktop/risorse/icona.png",
       "package.json"
@@ -86,11 +87,22 @@
         "it_IT"
       ],
       "language": "1040",
-      "artifactName": "Customer-Map-Potential-Setup-${version}.${ext}"
+      "artifactName": "Customer-Map-Potential-Setup.${ext}"
     },
     "portable": {
-      "artifactName": "Customer-Map-Potential-Portable-${version}.${ext}"
-    }
+      "artifactName": "Customer-Map-Potential-Portable.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "wrz89",
+        "repo": "customer-map-potential",
+        "releaseType": "release"
+      }
+    ]
   },
-  "productName": "Customer Map Potential"
+  "productName": "Customer Map Potential",
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
 }
