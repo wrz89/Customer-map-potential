@@ -51,7 +51,7 @@ export function normalizzaIndirizzo(via: string | null | undefined, comune?: str
   return `${v}|${normalizzaNome(comune)}`
 }
 
-function tokens(s: string): string[] {
+export function tokens(s: string): string[] {
   return s.split(' ').filter((t) => t.length > 1 && !STOP.has(t))
 }
 

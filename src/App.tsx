@@ -51,6 +51,7 @@ import {
   type ListaClienti,
 } from './lib/store'
 import { affinaPosizione, chiaveNome, indiceComuni, rigaDaDealer } from './lib/importaDealer'
+import { unisciConOsm } from './lib/unisci'
 import { calcolaZona, type Concorrente, type Zona } from './lib/zone'
 
 type Tab = 'mappa' | 'territorio' | 'settori' | 'aziende' | 'confronto'
@@ -278,6 +279,22 @@ export default function App() {
     }
   }, [prossimoDaAffinare?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // tutti gli acquisti del dealer senza doppioni; le attività di OpenStreetMap e gli elenchi Telemaco/Openapi
+  // che parlano della stessa impresa diventano un solo record (posizione e telefono da OSM, partita IVA e addetti dagli elenchi)
+  const { elenco: aziendeUnite, uniti: idUniti } = useMemo(() => {
+    if (!sel) return { elenco: [] as Azienda[], uniti: new Set<string>() }
+    const m = new Map<string, Azienda>()
+    for (const acq of acquisti) {
+      if (acq.scopo === 'concorrenza') continue
+      for (const a of acq.aziende) {
+        const k = a.piva || a.id
+        const prima = m.get(k)
+        if (!prima || PRIORITA_FONTE[a.fonte] > PRIORITA_FONTE[prima.fonte]) m.set(k, a)
+      }
+    }
+    return unisciConOsm([...m.values()])
+  }, [acquisti, sel])
+
   // Posizione esatta delle imprese importate (Telemaco): con raggi piccoli il centro del comune non basta.
   // Solo le imprese dei comuni della zona, una al secondo, e solo dopo aver finito con i dealer.
   const acquistiRef = useRef(acquisti)
@@ -287,9 +304,9 @@ export default function App() {
     const out: { acqId: string; aziendaId: string; a: Azienda }[] = []
     for (const acq of acquisti)
       for (const a of acq.aziende)
-        if (inComune(a) && !a.cercato && a.indirizzo.trim() && comuneInZona(a.comune)) out.push({ acqId: acq.id, aziendaId: a.id, a })
+        if (inComune(a) && !a.cercato && !idUniti.has(a.id) && a.indirizzo.trim() && comuneInZona(a.comune)) out.push({ acqId: acq.id, aziendaId: a.id, a })
     return out
-  }, [acquisti, zona, daAffinare.length, comuneInZona])
+  }, [acquisti, zona, daAffinare.length, comuneInZona, idUniti])
   const prossimaAzienda = daLocalizzare[0]
   const chiaveProssima = prossimaAzienda ? `${prossimaAzienda.acqId}|${prossimaAzienda.aziendaId}` : ''
   useEffect(() => {
@@ -319,17 +336,7 @@ export default function App() {
 
   // aziende del dealer: unione degli acquisti, senza doppioni, dentro il raggio attuale
   const aziende = useMemo(() => {
-    if (!sel) return []
-    const m = new Map<string, Azienda>()
-    for (const acq of acquisti) {
-      if (acq.scopo === 'concorrenza') continue
-      for (const a of acq.aziende) {
-        const k = a.piva || a.id
-        const prima = m.get(k)
-        if (!prima || PRIORITA_FONTE[a.fonte] > PRIORITA_FONTE[prima.fonte]) m.set(k, a)
-      }
-    }
-    return [...m.values()]
+    return aziendeUnite
       .map((a) => (a.lat !== null && a.lon !== null && centro && !inComune(a) ? { ...a, distanzaKm: Math.round(distanzaKm(centro.lat, centro.lon, a.lat, a.lon) * 100) / 100 } : a))
       // posizione solo al centro del comune: conta se il comune è nella zona; altrimenti la distanza dal centro
       .filter((a) => {
@@ -338,7 +345,7 @@ export default function App() {
         if (a.lat === null) return !a.comune || comuneInZona(a.comune)
         return a.distanzaKm === null || a.distanzaKm <= raggio
       })
-  }, [acquisti, sel, centro?.lat, centro?.lon, raggio, comuneInZona]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [aziendeUnite, centro?.lat, centro?.lon, raggio, comuneInZona]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const esiti = useMemo(() => {
     const out = new Map<string, EsitoMatch>()

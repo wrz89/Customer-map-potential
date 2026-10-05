@@ -27,6 +27,8 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
   const [errore, setErrore] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const tabellaRef = useRef<HTMLDivElement>(null)
+  const [guida, setGuida] = useState(false)
 
   // filtri tabella
   const [q, setQ] = useState('')
@@ -107,7 +109,8 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
       const perCat = new Map<string, number>()
       for (const a of r.aziende) perCat.set(a.categoria, (perCat.get(a.categoria) ?? 0) + 1)
       const top = [...perCat.entries()].sort((x, y) => y[1] - x[1]).slice(0, 4).map(([c, n]) => `${c} ${n0(n)}`).join(', ')
-      setInfo(`Trovate ${n0(r.aziende.length)} attività con nome da OpenStreetMap (${top}). Non hanno addetti né partita IVA, e la copertura è parziale: Telemaco le completa.`)
+      setInfo(`Trovate ${n0(r.aziende.length)} attività con nome da OpenStreetMap (${top}). Le trovi nella tabella qui sotto e in mappa. Non hanno addetti né partita IVA, e la copertura è parziale: Telemaco le completa.`)
+      setTimeout(() => tabellaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300)
     } catch (e) {
       setErrore((e as Error).message)
     } finally {
@@ -157,7 +160,8 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
     { id: 'flotta', label: 'Flotta', valore: (a) => ({ Alta: 3, Media: 2, Bassa: 1, '': 0 })[a.flotta], render: (a) => <FlottaBadge f={a.flotta} /> },
     { id: 'dip', label: 'Dipendenti', valore: (a) => a.dipendenti, render: (a) => n0(a.dipendenti), destra: true },
     { id: 'fatt', label: 'Fatturato', valore: (a) => a.fatturato, render: (a) => (a.fatturato ? `${n0(a.fatturato / 1000)} k€` : '–'), destra: true },
-    { id: 'comune', label: 'Comune', valore: (a) => a.comune, render: (a) => <div><div>{a.comune} {a.provincia && <span style={{ color: 'var(--muted)' }}>{a.provincia}</span>}</div><div className="text-[11px]" style={{ color: 'var(--muted)' }}>{a.indirizzo}</div></div> },
+    { id: 'comune', label: 'Indirizzo', valore: (a) => a.indirizzo || a.comune, render: (a) => <div><div>{a.indirizzo || <span style={{ color: 'var(--muted)' }}>indirizzo n.d.</span>}</div><div className="text-[11px]" style={{ color: 'var(--muted)' }}>{[a.cap, a.comune, a.provincia].filter(Boolean).join(' ')}</div></div> },
+    { id: 'contatto', label: 'Telefono / sito', valore: (a) => a.contatto ?? '', render: (a) => (a.contatto ? <span className="break-all text-xs">{a.contatto}</span> : <span style={{ color: 'var(--muted)' }}>–</span>) },
     { id: 'dist', label: 'Distanza', valore: (a) => a.distanzaKm, render: (a) => distKm(a.distanzaKm), destra: true },
   ]
 
@@ -261,12 +265,49 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
         </div>
       </div>
 
-      <GuidaTelemaco zona={zona} />
-
+      {occupato === 'osm' && <Avviso tipo="info">Cerco su OpenStreetMap, può richiedere un minuto. Il risultato compare qui sotto e in mappa.</Avviso>}
       {errore && <Avviso tipo="errore">{errore}</Avviso>}
       {info && <Avviso tipo="ok">{info}</Avviso>}
       {demoPresente && <Avviso tipo="warn">Nell'elenco ci sono aziende DIMOSTRATIVE. Eliminale dal registro prima di dare il file al dealer.</Avviso>}
 
+      <div ref={tabellaRef}>
+      <Sezione
+        titolo={`Aziende nel raggio (${n0(filtrate.length)}${filtrate.length !== aziende.length ? ` di ${n0(aziende.length)}` : ''})`}
+        sotto="Indirizzo e coordinate della sede legale"
+        azioni={
+          <>
+            <input className="input !w-44" placeholder="Cerca nome, comune, P.IVA" value={q} onChange={(e) => setQ(e.target.value)} />
+            <select className="input !w-48" value={fCat} onChange={(e) => setFCat(e.target.value)}>
+              <option value="">Tutte le categorie</option>
+              {categorieTrovate.map((c) => (
+                <option key={c}>{c}</option>
+              ))}
+            </select>
+            <select className="input !w-32" value={fFlotta} onChange={(e) => setFFlotta(e.target.value)}>
+              <option value="">Ogni flotta</option>
+              <option>Alta</option>
+              <option>Media</option>
+              <option>Bassa</option>
+            </select>
+            <select className="input !w-36" value={fMin} onChange={(e) => setFMin(Number(e.target.value))}>
+              {[0, 10, 20, 50, 100, 250].map((v) => (
+                <option key={v} value={v}>{v ? `${v}+ dipendenti` : 'Ogni dimensione'}</option>
+              ))}
+            </select>
+          </>
+        }
+      >
+        <div className="max-h-[620px] overflow-auto">
+          <Tabella
+            righe={filtrate}
+            colonne={colonne}
+            chiave={(a) => a.id}
+            ordineIniziale={{ id: 'dip', desc: true }}
+            vuoto="Nessuna azienda: stima e acquista i nominativi, importa un file o genera i dati dimostrativi."
+          />
+        </div>
+      </Sezione>
+      </div>
       {acquisti.length > 0 && (
         <Sezione titolo="Registro acquisti e import" sotto="Salvati in questo browser, per non ricomprare la stessa zona">
           <div className="overflow-x-auto">
@@ -304,42 +345,12 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
         </Sezione>
       )}
 
-      <Sezione
-        titolo={`Aziende nel raggio (${n0(filtrate.length)}${filtrate.length !== aziende.length ? ` di ${n0(aziende.length)}` : ''})`}
-        sotto="Indirizzo e coordinate della sede legale"
-        azioni={
-          <>
-            <input className="input !w-44" placeholder="Cerca nome, comune, P.IVA" value={q} onChange={(e) => setQ(e.target.value)} />
-            <select className="input !w-48" value={fCat} onChange={(e) => setFCat(e.target.value)}>
-              <option value="">Tutte le categorie</option>
-              {categorieTrovate.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-            <select className="input !w-32" value={fFlotta} onChange={(e) => setFFlotta(e.target.value)}>
-              <option value="">Ogni flotta</option>
-              <option>Alta</option>
-              <option>Media</option>
-              <option>Bassa</option>
-            </select>
-            <select className="input !w-36" value={fMin} onChange={(e) => setFMin(Number(e.target.value))}>
-              {[0, 10, 20, 50, 100, 250].map((v) => (
-                <option key={v} value={v}>{v ? `${v}+ dipendenti` : 'Ogni dimensione'}</option>
-              ))}
-            </select>
-          </>
-        }
-      >
-        <div className="max-h-[620px] overflow-auto">
-          <Tabella
-            righe={filtrate}
-            colonne={colonne}
-            chiave={(a) => a.id}
-            ordineIniziale={{ id: 'dip', desc: true }}
-            vuoto="Nessuna azienda: stima e acquista i nominativi, importa un file o genera i dati dimostrativi."
-          />
-        </div>
-      </Sezione>
+      <div>
+        <button className="btn !py-1 text-xs" onClick={() => setGuida((x) => !x)} aria-expanded={guida}>
+          {guida ? 'Nascondi' : 'Mostra'} i codici ATECO da chiedere a Telemaco
+        </button>
+      </div>
+      {guida && <GuidaTelemaco zona={zona} />}
     </div>
   )
 }

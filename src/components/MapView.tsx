@@ -43,7 +43,7 @@ const LIVELLI: { id: Livello; nome: string; layer: string[] }[] = [
   { id: 'anelli', nome: 'Anelli di distanza', layer: ['anelli-line', 'anelli-label'] },
   { id: 'concorrenza', nome: 'Gommisti concorrenti', layer: ['conc-gomm'] },
   { id: 'officine', nome: 'Altre officine', layer: ['conc-off'] },
-  { id: 'aziende', nome: 'Aziende', layer: ['aziende-pt'] },
+  { id: 'aziende', nome: 'Aziende', layer: ['aziende-pt', 'aziende-label'] },
   { id: 'dealer', nome: 'Altri SuperService', layer: ['dealer-halo', 'dealer-pt', 'dealer-label'] },
 ]
 
@@ -93,7 +93,7 @@ function aggiungiLivelli(map: MLMap, scuro: boolean, leggero: boolean) {
   const vuota = { type: 'FeatureCollection', features: [] } as GeoJSON.FeatureCollection
   // etichette in sorgenti separate: se i font della mappa di base non arrivano,
   // spariscono solo le scritte, non i cerchi e i punti
-  for (const id of ['comuni', 'anelli', 'concorrenza', 'aziende', 'dealer', 'anelli-testo', 'dealer-testo']) {
+  for (const id of ['comuni', 'anelli', 'concorrenza', 'aziende', 'dealer', 'anelli-testo', 'dealer-testo', 'aziende-testo']) {
     map.addSource(id, { type: 'geojson', data: vuota })
   }
   const seq = SEQ.map(css)
@@ -159,12 +159,21 @@ function aggiungiLivelli(map: MLMap, scuro: boolean, leggero: boolean) {
     type: 'circle',
     source: 'aziende',
     paint: {
-      'circle-radius': ['interpolate', ['linear'], ['sqrt', ['max', ['get', 'dip'], 1]], 1, 3.5, 10, 7, 35, 14],
+      'circle-radius': ['interpolate', ['linear'], ['sqrt', ['max', ['get', 'dip'], 1]], 1, 5.5, 10, 8, 35, 14],
       'circle-color': ['get', 'colore'],
       'circle-stroke-color': ['case', ['boolean', ['feature-state', 'scelto'], false], inchiostro, scuro ? '#131a26' : '#ffffff'],
       'circle-stroke-width': ['case', ['boolean', ['feature-state', 'scelto'], false], 3, 1.5],
       'circle-opacity': 0.9,
     },
+  })
+  // nome dell'azienda quando si è abbastanza vicini da leggerlo
+  if (conFont) map.addLayer({
+    id: 'aziende-label',
+    type: 'symbol',
+    source: 'aziende-testo',
+    minzoom: 15.5,
+    layout: { 'text-field': ['get', 'nome'], 'text-size': 11, 'text-offset': [0, 0.9], 'text-anchor': 'top', 'text-font': ['Noto Sans Bold'], 'text-optional': true, 'text-max-width': 9 },
+    paint: { 'text-color': inchiostro, 'text-halo-color': alone, 'text-halo-width': 1.6 },
   })
   map.addLayer({ id: 'dealer-halo', type: 'circle', source: 'dealer', paint: { 'circle-radius': 10, 'circle-color': '#f5b301', 'circle-opacity': 0.22 } })
   map.addLayer({
@@ -316,6 +325,7 @@ export default function MapView(props: Props) {
         properties: {
           id: a.id,
           dip: a.dipendenti ?? 0,
+          nome: a.ragioneSociale,
           colore: coloreStato ? STATO_COLORE[st] : fl === 'n.d.' ? '#8a8f98' : css(`--flotta-${fl.toLowerCase()}`),
         },
       })
@@ -569,6 +579,7 @@ export default function MapView(props: Props) {
     set('anelli', anelliFC)
     set('anelli-testo', anelliFC)
     set('aziende', aziendeFC)
+    set('aziende-testo', aziendeFC)
     set('concorrenza', concorrenzaFC)
     set('dealer', dealerFC)
     set('dealer-testo', dealerFC)
