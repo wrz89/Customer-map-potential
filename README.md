@@ -45,14 +45,23 @@ La cernita nell'Excel funziona senza macro. Abbina per partita IVA, poi per nome
 
 Due file, da scegliere:
 
-- **Customer-Map-Potential-Setup-1.0.0.exe**: installatore. Crea l'icona sul desktop e nel menu Start, si disinstalla da "App installate".
-- **Customer-Map-Potential-Portable-1.0.0.exe**: versione portatile, si avvia con doppio clic senza installare.
+- **Customer-Map-Potential-Setup.exe**: installatore. Crea l'icona sul desktop e nel menu Start, si disinstalla da "App installate".
+- **Customer-Map-Potential-Portable.exe** (dentro lo zip): versione portatile, si avvia con doppio clic senza installare.
 
 Al primo avvio Windows può mostrare "Windows ha protetto il PC": il programma non ha una firma digitale a pagamento. Clic su **Ulteriori informazioni**, poi **Esegui comunque**.
 
 - I dati di comuni, veicoli e settori sono dentro il programma. Dealer, acquisti e liste clienti restano sul PC, nella cartella che si apre da **File → Apri la cartella dei dati**.
 - Il token Openapi si inserisce in **Impostazioni**. Viene cifrato con la protezione di Windows e la pagina non lo vede mai.
-- Internet serve solo per lo sfondo stradale, la ricerca indirizzi, OpenStreetMap e Openapi.
+- Internet serve solo per la mappa, la ricerca indirizzi, OpenStreetMap e Openapi.
+- **Mappa di base**, menu in alto sulla mappa: *Stradale* (stile simile a Google, gratis, OpenFreeMap), *Chiara* (per leggere i colori dei comuni), e con una chiave Google *Google Maps* e *Google satellite*.
+
+### Mappa Google (facoltativa)
+
+1. Su console.cloud.google.com crea un progetto e collega un account di fatturazione (serve una carta).
+2. Attiva solo **Map Tiles API** e crea una chiave API. In "Restrizioni API" limitala a Map Tiles API.
+3. Nell'app: **Impostazioni → Mappa Google**, incolla la chiave (`AIza…`). Resta sul PC, cifrata; le tessere passano dal programma e la pagina non vede la chiave.
+
+Costi: Map Tiles API ha 100.000 tessere 2D gratis al mese, poi si paga a consumo; una schermata di mappa usa circa 20-40 tessere, quindi l'uso interno di pochi utenti resta di norma nella quota gratuita. Limite di 15.000 tessere al giorno per progetto. Google chiede di mostrare la sua attribuzione, che l'app aggiunge in basso. I dati Google Places restano esclusi, come spiegato sotto.
 - L'app non apre porte di rete: dagli altri PC non si raggiunge.
 
 Per ricreare i file: `npm run installer` su Windows, oppure dalla scheda **Actions** di GitHub, flusso "Installer Windows", che crea installatore e versione portatile, li installa, avvia l'app e ne controlla il funzionamento.
@@ -110,8 +119,9 @@ Openapi non chiarisce se gli 0,10 € valgono per ogni chiamata o per ogni azien
 
 1. Registrati su console.openapi.com e attiva il servizio **Company**.
 2. Ricarica il portafoglio prepagato: carta, PayPal o bonifico, senza canone. C'è anche la ricarica automatica.
-3. Crea un token con accesso a `IT-search`, anche per l'ambiente di test.
-4. App locale: incolla il token in `impostazioni.txt` alla riga `OPENAPI_TOKEN=`, lascia `OPENAPI_SANDBOX=1` per la prova e riavvia. Per i dati veri metti `OPENAPI_SANDBOX=0`.
+3. Crea il token: nella console, sezione **Token**, scegli gli ambiti (scope) del servizio Company, almeno `IT-search` (oppure tutto `company.openapi.com`) e una scadenza, per esempio un anno. Il token è una lunga stringa: chi la possiede spende dal tuo portafoglio, quindi non va mandata per email né messa in file condivisi. Un token di prova (sandbox) si crea allo stesso modo nell'ambiente di test e non scala credito.
+4. App per PC: **Impostazioni → Openapi**, incolla il token e salva. Lascia spuntato "Ambiente di prova" finché non vuoi comprare dati veri.
+   App locale con Python: incolla il token in `impostazioni.txt` alla riga `OPENAPI_TOKEN=`, lascia `OPENAPI_SANDBOX=1` per la prova e riavvia. Per i dati veri metti `OPENAPI_SANDBOX=0`.
 5. Nell'app: **Aziende → Stima costo → Acquista** per i clienti potenziali, **Territorio → Concorrenza → Stima con Openapi** per i gommisti.
 
 Gli acquisti restano nel registro del dealer, così la stessa zona non si ricompra.

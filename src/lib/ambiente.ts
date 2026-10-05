@@ -29,6 +29,8 @@ export async function salvaFile(nome: string, blob: Blob): Promise<void> {
 export interface StatoDesktop {
   haToken: boolean
   tokenFinale: string
+  haGoogle?: boolean
+  googleFinale?: string
   cifrato: boolean
   sandbox: boolean
   versione: string
@@ -45,7 +47,7 @@ export interface StatoAggiornamento {
 
 interface DesktopApi {
   leggiImpostazioni: () => Promise<StatoDesktop>
-  salvaImpostazioni: (v: { token?: string; sandbox?: boolean }) => Promise<StatoDesktop>
+  salvaImpostazioni: (v: { token?: string; sandbox?: boolean; google?: string }) => Promise<StatoDesktop>
   statoAggiornamento?: () => Promise<StatoAggiornamento>
   verificaAggiornamenti?: () => Promise<StatoAggiornamento>
   installaAggiornamento?: () => Promise<void>

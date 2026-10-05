@@ -28,29 +28,31 @@ function leggiImpostazioni() {
   }
 }
 
-function token() {
-  const imp = leggiImpostazioni()
-  if (!imp.token) return ''
+function segreto(imp, campo) {
+  if (!imp[campo]) return ''
   try {
-    return imp.cifrato ? safeStorage.decryptString(Buffer.from(imp.token, 'base64')) : imp.token
+    return imp.cifrato ? safeStorage.decryptString(Buffer.from(imp[campo], 'base64')) : imp[campo]
   } catch {
     return ''
   }
 }
 
-function salvaImpostazioni({ token: nuovo, sandbox }) {
+function salvaSegreto(imp, campo, valore) {
+  if (!valore.trim()) return delete imp[campo]
+  // stessa protezione per tutti i segreti: se un campo è cifrato, lo sono tutti
+  imp[campo] = imp.cifrato ? safeStorage.encryptString(valore.trim()).toString('base64') : valore.trim()
+}
+
+const token = () => segreto(leggiImpostazioni(), 'token')
+const chiaveGoogle = () => segreto(leggiImpostazioni(), 'google')
+
+function salvaImpostazioni({ token: nuovo, sandbox, google }) {
   const imp = leggiImpostazioni()
-  if (typeof nuovo === 'string') {
-    if (!nuovo.trim()) {
-      delete imp.token
-      delete imp.cifrato
-    } else if (safeStorage.isEncryptionAvailable()) {
-      imp.token = safeStorage.encryptString(nuovo.trim()).toString('base64')
-      imp.cifrato = true
-    } else {
-      imp.token = nuovo.trim()
-      imp.cifrato = false
-    }
+  if (imp.cifrato === undefined) imp.cifrato = safeStorage.isEncryptionAvailable()
+  if (typeof nuovo === 'string') salvaSegreto(imp, 'token', nuovo)
+  if (typeof google === 'string') {
+    salvaSegreto(imp, 'google', google)
+    sessioniGoogle.clear()
   }
   if (typeof sandbox === 'boolean') imp.sandbox = sandbox
   fs.mkdirSync(path.dirname(IMPOSTAZIONI()), { recursive: true })
@@ -61,13 +63,60 @@ function salvaImpostazioni({ token: nuovo, sandbox }) {
 function statoImpostazioni() {
   const imp = leggiImpostazioni()
   const t = token()
+  const g = chiaveGoogle()
   return {
     haToken: !!t,
     tokenFinale: t ? `…${t.slice(-4)}` : '',
+    haGoogle: !!g,
+    googleFinale: g ? `…${g.slice(-4)}` : '',
     cifrato: !!imp.cifrato,
     sandbox: imp.sandbox !== false,
     versione: app.getVersion(),
     cartellaDati: app.getPath('userData'),
+  }
+}
+
+/* ---------- mappe Google (Map Tiles API): la chiave resta qui, la pagina chiede le tessere a noi ---------- */
+
+const TIPI_GOOGLE = {
+  roadmap: { mapType: 'roadmap' },
+  satellite: { mapType: 'satellite', layerTypes: ['layerRoadmap'] },
+}
+const sessioniGoogle = new Map()
+
+async function sessioneGoogle(tipo) {
+  const s = sessioniGoogle.get(tipo)
+  if (s && s.scade > Date.now() + 3600_000) return s.id
+  const r = await net.fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(chiaveGoogle())}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...TIPI_GOOGLE[tipo], language: 'it-IT', region: 'IT', scale: 'scaleFactor2x', highDpi: true }),
+  })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok || !j.session) throw new Error(j.error?.message || `Google ha risposto ${r.status}`)
+  sessioniGoogle.set(tipo, { id: j.session, scade: Number(j.expiry) * 1000 })
+  return j.session
+}
+
+async function gestisciGoogle(url) {
+  const tipo = url.searchParams.get('tipo')
+  if (!TIPI_GOOGLE[tipo]) return Response.json({ errore: 'Tipo di mappa sconosciuto' }, { status: 400 })
+  if (!chiaveGoogle()) return Response.json({ errore: 'Chiave Google non inserita' }, { status: 401 })
+  try {
+    const chiave = encodeURIComponent(chiaveGoogle())
+    const sessione = await sessioneGoogle(tipo)
+    const m = url.pathname.match(/^\/api\/google\/tile\/(\d+)\/(\d+)\/(\d+)$/)
+    if (m) return net.fetch(`https://tile.googleapis.com/v1/2dtiles/${m[1]}/${m[2]}/${m[3]}?session=${sessione}&key=${chiave}`)
+    if (url.pathname === '/api/google/viewport') {
+      const q = new URLSearchParams({ session: sessione, key: chiaveGoogle() })
+      for (const k of ['zoom', 'north', 'south', 'east', 'west']) q.set(k, url.searchParams.get(k) ?? '')
+      const r = await net.fetch(`https://tile.googleapis.com/tile/v1/viewport?${q}`)
+      const j = await r.json().catch(() => ({}))
+      return Response.json({ copyright: j.copyright ?? '' }, { status: r.ok ? 200 : r.status })
+    }
+    return new Response('Non trovato', { status: 404 })
+  } catch (e) {
+    return Response.json({ errore: e.message }, { status: 502 })
   }
 }
 
@@ -76,6 +125,7 @@ function statoImpostazioni() {
 async function gestisciRichiesta(request) {
   const url = new URL(request.url)
   if (url.host !== HOST) return new Response('Non trovato', { status: 404 })
+  if (url.pathname.startsWith('/api/google/')) return gestisciGoogle(url)
   if (url.pathname === '/api/companies') {
     if (request.method !== 'POST') return Response.json({ errore: 'Usa POST' }, { status: 405 })
     try {

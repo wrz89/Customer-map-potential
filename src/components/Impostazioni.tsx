@@ -70,6 +70,7 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
     <Modale titolo="Impostazioni" onClose={onClose}>
       <div className="space-y-5 text-sm">
         {desktop && <OpenapiDesktop />}
+        {desktop && <GoogleDesktop />}
         {desktop?.verificaAggiornamenti && <Aggiornamenti />}
         {!desktop && <div>
           <div className="font-bold">Password dell'app</div>
@@ -203,6 +204,48 @@ function Aggiornamenti() {
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+function GoogleDesktop() {
+  const [stato, setStato] = useState<StatoDesktop | null>(null)
+  const [chiave, setChiave] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  useEffect(() => {
+    desktop?.leggiImpostazioni().then(setStato)
+  }, [])
+  if (!stato) return null
+  return (
+    <div>
+      <div className="font-bold">Mappa Google (facoltativa)</div>
+      <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
+        Con una chiave Google Maps Platform, nella mappa compaiono anche "Google Maps" e "Google satellite". Senza chiave resta la mappa stradale gratuita.
+        La chiave si crea su console.cloud.google.com, attivando solo "Map Tiles API". Resta su questo PC, cifrata.
+      </p>
+      <div className="mt-2 text-xs">
+        Stato: {stato.haGoogle ? <b style={{ color: 'var(--good-ink)' }}>chiave inserita, termina con {stato.googleFinale}</b> : <b>nessuna chiave</b>}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <input className="input" type="password" value={chiave} onChange={(e) => setChiave(e.target.value)} placeholder={stato.haGoogle ? 'Incolla una nuova chiave per sostituirla' : 'Incolla la chiave Google (AIza…)'} />
+        <button
+          className="btn btn-primary"
+          disabled={!chiave.trim()}
+          onClick={async () => {
+            setStato(await desktop!.salvaImpostazioni({ google: chiave }))
+            setChiave('')
+            setMsg('Chiave salvata: scegli "Google Maps" nel menu della mappa')
+          }}
+        >
+          Salva
+        </button>
+      </div>
+      {stato.haGoogle && (
+        <button className="btn mt-2 !py-1 text-xs" onClick={async () => { setStato(await desktop!.salvaImpostazioni({ google: '' })); setMsg('Chiave rimossa') }}>
+          Rimuovi chiave
+        </button>
+      )}
+      {msg && <div className="mt-2"><Avviso tipo="ok">{msg}</Avviso></div>}
     </div>
   )
 }

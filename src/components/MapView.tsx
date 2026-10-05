@@ -9,7 +9,7 @@ import type { Azienda } from '../lib/companies'
 import { quotaVecchie } from '../lib/eta'
 import { n0, n1 } from '../lib/fmt'
 import type { EsitoMatch, StatoMatch } from '../lib/match'
-import { DEMO } from '../lib/ambiente'
+import { DEMO, desktop } from '../lib/ambiente'
 import { geocodifica, type Dealer } from '../lib/store'
 import type { Zona } from '../lib/zone'
 
@@ -67,10 +67,41 @@ const stileVuoto = (tema: 'light' | 'dark'): maplibregl.StyleSpecification => ({
   sources: {},
   layers: [{ id: 'sfondo', type: 'background', paint: { 'background-color': tema === 'dark' ? '#0f1520' : '#eef0f3' } }],
 })
-const stileBase = (tema: 'light' | 'dark'): string | maplibregl.StyleSpecification =>
-  DEMO ? stileVuoto(tema) : `https://tiles.openfreemap.org/styles/${tema === 'dark' ? 'dark' : 'positron'}`
 
-function aggiungiLivelli(map: MLMap, scuro: boolean) {
+/** Mappe di base: OpenFreeMap gratis; Google solo nell'app per PC, con la chiave in Impostazioni. */
+export type Base = 'stradale' | 'chiara' | 'google' | 'satellite'
+const BASI: { id: Base; nome: string; google?: boolean }[] = [
+  { id: 'stradale', nome: 'Stradale' },
+  { id: 'chiara', nome: 'Chiara, per leggere i dati' },
+  { id: 'google', nome: 'Google Maps', google: true },
+  { id: 'satellite', nome: 'Google satellite', google: true },
+]
+const OFM = 'https://tiles.openfreemap.org'
+const stileGoogle = (tipo: 'roadmap' | 'satellite'): maplibregl.StyleSpecification => ({
+  version: 8,
+  glyphs: `${OFM}/fonts/{fontstack}/{range}.pbf`,
+  sources: {
+    google: { type: 'raster', tiles: [`${location.origin}/api/google/tile/{z}/{x}/{y}?tipo=${tipo}`], tileSize: 256, maxzoom: 20 },
+  },
+  layers: [{ id: 'google', type: 'raster', source: 'google' }],
+})
+const stileBase = (tema: 'light' | 'dark', base: Base): string | maplibregl.StyleSpecification => {
+  if (DEMO) return stileVuoto(tema)
+  if (base === 'google') return stileGoogle('roadmap')
+  if (base === 'satellite') return stileGoogle('satellite')
+  if (tema === 'dark') return `${OFM}/styles/dark`
+  return `${OFM}/styles/${base === 'stradale' ? 'liberty' : 'positron'}`
+}
+const leggiBase = (): Base => {
+  try {
+    const b = localStorage.getItem('cmp.base') as Base | null
+    return b && BASI.some((x) => x.id === b) ? b : 'stradale'
+  } catch {
+    return 'stradale'
+  }
+}
+
+function aggiungiLivelli(map: MLMap, scuro: boolean, leggero: boolean) {
   const vuota = { type: 'FeatureCollection', features: [] } as GeoJSON.FeatureCollection
   // etichette in sorgenti separate: se i font della mappa di base non arrivano,
   // spariscono solo le scritte, non i cerchi e i punti
@@ -78,6 +109,8 @@ function aggiungiLivelli(map: MLMap, scuro: boolean) {
     map.addSource(id, { type: 'geojson', data: vuota })
   }
   const seq = SEQ.map(css)
+  // colori dei comuni sotto i nomi di città e strade della mappa di base, come su Google
+  const sottoNomi = map.getStyle().layers.find((l) => l.type === 'symbol')?.id
   const alone = scuro ? '#0b0f17' : '#ffffff'
   const inchiostro = scuro ? '#f3f4f6' : '#0f2a4a'
   map.addLayer({
@@ -86,9 +119,10 @@ function aggiungiLivelli(map: MLMap, scuro: boolean) {
     source: 'comuni',
     paint: {
       'fill-color': ['match', ['get', 'cls'], 0, seq[0], 1, seq[1], 2, seq[2], 3, seq[3], 4, seq[4], 5, seq[5], css('--line')],
-      'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 0.88, scuro ? 0.55 : 0.62],
+      // sulle mappe ricche di dettagli il colore dei comuni è più leggero, per leggere strade e nomi
+      'fill-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], leggero ? 0.7 : 0.88, leggero ? 0.38 : scuro ? 0.55 : 0.62],
     },
-  })
+  }, sottoNomi)
   map.addLayer({
     id: 'comuni-line',
     type: 'line',
@@ -97,7 +131,7 @@ function aggiungiLivelli(map: MLMap, scuro: boolean) {
       'line-color': ['case', ['boolean', ['feature-state', 'scelto'], false], inchiostro, alone],
       'line-width': ['case', ['boolean', ['feature-state', 'scelto'], false], 2.5, 0.8],
     },
-  })
+  }, sottoNomi)
   map.addLayer({
     id: 'anelli-line',
     type: 'line',
@@ -210,6 +244,14 @@ export default function MapView(props: Props) {
   const [risultati, setRisultati] = useState<{ nome: string; lat: number; lon: number }[]>([])
   const [pannello, setPannello] = useState(true)
   const [erroreMappa, setErroreMappa] = useState(false)
+  const [base, setBase] = useState<Base>(leggiBase)
+  const [haGoogle, setHaGoogle] = useState(false)
+  const [copyGoogle, setCopyGoogle] = useState('')
+  // senza chiave Google si resta sulla mappa stradale
+  const baseEff: Base = BASI.find((b) => b.id === base)?.google && !haGoogle ? 'stradale' : base
+  const baseRef = useRef(baseEff)
+  baseRef.current = baseEff
+  const aggiornaGoogle = () => desktop?.leggiImpostazioni().then((s) => setHaGoogle(!!s.haGoogle))
 
   // i gestori degli eventi della mappa leggono sempre i valori aggiornati
   const live = useRef(props)
@@ -334,7 +376,7 @@ export default function MapView(props: Props) {
     try {
       map = new maplibregl.Map({
       container: ref.current,
-      style: stileBase(live.current.tema),
+      style: stileBase(live.current.tema, baseRef.current),
       center: c ? [c.lon, c.lat] : [9.6, 45.4],
       zoom: c ? 9.4 : 7,
       attributionControl: { compact: true },
@@ -363,7 +405,7 @@ export default function MapView(props: Props) {
     let stileCaricato = false
     map.on('style.load', () => {
       stileCaricato = true
-      aggiungiLivelli(map, live.current.tema === 'dark')
+      aggiungiLivelli(map, live.current.tema === 'dark', baseRef.current !== 'chiara')
       setPronta((x) => x + 1)
     })
     // se la mappa di base non risponde, si passa allo sfondo semplice: i dati restano visibili
@@ -521,10 +563,38 @@ export default function MapView(props: Props) {
   /* ---------- sincronizzazione ---------- */
 
   useEffect(() => {
+    aggiornaGoogle()
+  }, [])
+
+  useEffect(() => {
     const map = mapRef.current
-    if (map && pronta) map.setStyle(stileBase(tema))
+    if (map && pronta) map.setStyle(stileBase(tema, baseEff))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tema])
+  }, [tema, baseEff])
+
+  // Google chiede di mostrare la sua attribuzione, che cambia con la zona inquadrata
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || (baseEff !== 'google' && baseEff !== 'satellite')) return setCopyGoogle('')
+    const tipo = baseEff === 'google' ? 'roadmap' : 'satellite'
+    let ultimo = 0
+    const leggi = async () => {
+      const n = ++ultimo
+      const b = map.getBounds()
+      const q = new URLSearchParams({ tipo, zoom: String(Math.round(map.getZoom())), north: String(b.getNorth()), south: String(b.getSouth()), east: String(b.getEast()), west: String(b.getWest()) })
+      try {
+        const j = await (await fetch(`/api/google/viewport?${q}`)).json()
+        if (n === ultimo) setCopyGoogle(j.errore ? `errore: ${j.errore}` : j.copyright || '')
+      } catch {
+        /* resta l'ultima attribuzione */
+      }
+    }
+    leggi()
+    map.on('moveend', leggi)
+    return () => {
+      map.off('moveend', leggi)
+    }
+  }, [baseEff, pronta])
 
   useEffect(() => {
     if (visibile) mapRef.current?.resize()
@@ -616,6 +686,33 @@ export default function MapView(props: Props) {
             ))}
           </select>
         </div>
+        {!DEMO && (
+          <div className="card flex items-center gap-2 px-3 py-2 text-xs">
+            <Layers size={14} />
+            <select
+              className="bg-transparent font-semibold outline-none"
+              value={baseEff}
+              onMouseDown={aggiornaGoogle}
+              onFocus={aggiornaGoogle}
+              onChange={(e) => {
+                const b = e.target.value as Base
+                setBase(b)
+                try {
+                  localStorage.setItem('cmp.base', b)
+                } catch {
+                  /* preferenza non salvata */
+                }
+              }}
+              aria-label="Mappa di base"
+            >
+              {BASI.filter((b) => !b.google || desktop).map((b) => (
+                <option key={b.id} value={b.id} disabled={b.google && !haGoogle}>
+                  {b.nome}{b.google && !haGoogle ? ': serve la chiave in Impostazioni' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {!DEMO && <div className="relative">
           <div className="card flex items-center gap-1.5 px-3 py-1.5 text-xs">
             <Search size={14} />
@@ -660,6 +757,12 @@ export default function MapView(props: Props) {
           <Crosshair size={14} /> {esplora ? 'Clicca un punto della mappa' : 'Esplora un punto'}
         </button>
       </div>
+
+      {copyGoogle && (
+        <div className="absolute bottom-1 left-32 rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'rgb(255 255 255 / .8)', color: '#3c4043' }}>
+          <b>Google Maps</b> · {copyGoogle}
+        </div>
+      )}
 
       {/* pannello livelli e legenda */}
       <div className="absolute bottom-8 right-3 flex max-h-[calc(100%-110px)] flex-col items-end gap-2">
