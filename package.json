@@ -1,7 +1,7 @@
 {
   "name": "customer-map-potential",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,26 +11,86 @@
     "lint": "oxlint",
     "dati": "python3 scripts/build_data.py",
     "build:demo": "vite build --mode demo && python3 scripts/pagina_demo.py",
-    "pacchetto": "npm run build && python3 scripts/pacchetto.py"
-  },
-  "dependencies": {
-    "@turf/turf": "^7.4.0",
-    "exceljs": "^4.4.0",
-    "lucide-react": "^1.52.0",
-    "maplibre-gl": "^6.12.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "pacchetto": "npm run build && python3 scripts/pacchetto.py",
+    "desktop:prepara": "tsc server/openapi.ts --ignoreConfig --ignoreDeprecations 6.0 --module commonjs --target es2022 --moduleResolution node --skipLibCheck --outDir desktop/build && node -e \"require('fs').renameSync('desktop/build/openapi.js','desktop/build/openapi.cjs')\"",
+    "desktop": "npm run build && npm run desktop:prepara && electron .",
+    "installer": "npm run build && npm run desktop:prepara && electron-builder --win --x64"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@turf/turf": "^7.4.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "exceljs": "^4.4.0",
+    "lucide-react": "^1.52.0",
+    "maplibre-gl": "^6.12.0",
     "oxlint": "^1.81.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.3"
-  }
+  },
+  "description": "Potenziale clienti attorno ai dealer della rete SuperService",
+  "author": "Customer Map Potential",
+  "main": "desktop/main.cjs",
+  "build": {
+    "appId": "it.customermap.potential",
+    "productName": "Customer Map Potential",
+    "copyright": "Uso interno",
+    "directories": {
+      "output": "release",
+      "buildResources": "desktop/risorse"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/main.cjs",
+      "desktop/preload.cjs",
+      "desktop/build/**/*",
+      "desktop/risorse/icona.png",
+      "package.json"
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "desktop/risorse/icona.png",
+      "artifactName": "${productName}-${version}-${arch}-${target}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Customer Map Potential",
+      "installerLanguages": [
+        "it_IT"
+      ],
+      "language": "1040",
+      "artifactName": "Customer-Map-Potential-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Customer-Map-Potential-Portable-${version}.${ext}"
+    }
+  },
+  "productName": "Customer Map Potential"
 }

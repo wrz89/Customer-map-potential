@@ -1,0 +1,49 @@
+name: Installer Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/customer-map-mvp, main]
+    paths: ['src/**', 'desktop/**', 'server/**', 'public/**', 'package.json', 'package-lock.json', '.github/workflows/installer-windows.yml']
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Test
+        run: npx vitest run
+      - name: Crea installatore e versione portatile
+        run: npm run installer
+      - name: Installa in modo silenzioso
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release -Filter 'Customer-Map-Potential-Setup-*.exe' | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter 'Customer Map Potential.exe' | Select-Object -First 1 | ForEach-Object { "EXE=$($_.FullName)" | Out-File $env:GITHUB_ENV -Append }
+      - name: Avvia l'app installata e controlla
+        shell: pwsh
+        run: |
+          if (-not $env:EXE) { throw "Programma installato non trovato" }
+          $esito = "$env:RUNNER_TEMP\esito.json"
+          Start-Process -FilePath $env:EXE -ArgumentList "--prova-avvio=$esito" -Wait
+          Get-Content $esito
+          $j = Get-Content $esito | ConvertFrom-Json
+          if ($j.errore) { throw "Errore nella pagina: $($j.errore)" }
+          if (-not $j.datiComuni) { throw "Dati dei comuni non caricati" }
+          if (-not $j.abitanti) { throw "Indicatori non calcolati" }
+          if (-not $j.api.demo) { throw "API locale non risponde come previsto" }
+          Write-Host "Avvio verificato: $($j.dealer)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Customer-Map-Potential-Windows
+          path: |
+            release/Customer-Map-Potential-Setup-*.exe
+            release/Customer-Map-Potential-Portable-*.exe
+          retention-days: 30

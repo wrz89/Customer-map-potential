@@ -31,3 +31,5 @@ data/raw/
 !.env.demo
 dist-demo
 pacchetto/
+release/
+desktop/build/

@@ -209,6 +209,7 @@ export default function MapView(props: Props) {
   const [cerca, setCerca] = useState('')
   const [risultati, setRisultati] = useState<{ nome: string; lat: number; lon: number }[]>([])
   const [pannello, setPannello] = useState(true)
+  const [erroreMappa, setErroreMappa] = useState(false)
 
   // i gestori degli eventi della mappa leggono sempre i valori aggiornati
   const live = useRef(props)
@@ -329,13 +330,19 @@ export default function MapView(props: Props) {
   useEffect(() => {
     if (!ref.current) return
     const c = live.current.centro
-    const map = new maplibregl.Map({
+    let map: MLMap
+    try {
+      map = new maplibregl.Map({
       container: ref.current,
       style: stileBase(live.current.tema),
       center: c ? [c.lon, c.lat] : [9.6, 45.4],
       zoom: c ? 9.4 : 7,
       attributionControl: { compact: true },
     })
+    } catch {
+      setErroreMappa(true)
+      return
+    }
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     if (wrapRef.current) map.addControl(new maplibregl.FullscreenControl({ container: wrapRef.current }), 'top-right')
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left')
@@ -593,6 +600,11 @@ export default function MapView(props: Props) {
   return (
     <div ref={wrapRef} className="absolute inset-0" style={{ background: 'var(--surface-2)' }}>
       <div ref={ref} style={{ position: 'absolute', inset: 0 }} />
+      {erroreMappa && (
+        <div className="absolute inset-0 flex items-center justify-center p-8 text-center text-sm" style={{ color: 'var(--ink-2)' }}>
+          La mappa non si può disegnare: la scheda grafica di questo PC non supporta WebGL o è disattivata. Le schede Territorio, Settori, Aziende e Confronto funzionano lo stesso.
+        </div>
+      )}
 
       {/* barra in alto: metrica, ricerca, esplora */}
       <div className="absolute left-3 right-14 top-3 flex flex-wrap items-start gap-2">

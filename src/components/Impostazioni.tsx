@@ -1,5 +1,6 @@
 import { Download, Upload } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { desktop, type StatoDesktop } from '../lib/ambiente'
 import { indovinaColonne, leggiTabella, numero } from '../lib/leggiFile'
 import { geocodifica, type Dealer, type Impostazioni as Imp } from '../lib/store'
 import { Avviso, Modale } from './ui'
@@ -68,7 +69,8 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
   return (
     <Modale titolo="Impostazioni" onClose={onClose}>
       <div className="space-y-5 text-sm">
-        <div>
+        {desktop && <OpenapiDesktop />}
+        {!desktop && <div>
           <div className="font-bold">Password dell'app</div>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
             Serve solo se hai impostato APP_PASSWORD: nel file impostazioni.txt dell'app locale, o su Vercel. Protegge il credito Openapi.
@@ -79,7 +81,7 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
               Salva
             </button>
           </div>
-        </div>
+        </div>}
         <div>
           <div className="font-bold">Elenco dealer</div>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
@@ -99,5 +101,65 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
         {errore && <Avviso tipo="errore">{errore}</Avviso>}
       </div>
     </Modale>
+  )
+}
+
+function OpenapiDesktop() {
+  const [stato, setStato] = useState<StatoDesktop | null>(null)
+  const [token, setToken] = useState('')
+  const [msg, setMsg] = useState<string | null>(null)
+  useEffect(() => {
+    desktop?.leggiImpostazioni().then(setStato)
+  }, [])
+  if (!stato) return null
+  return (
+    <div>
+      <div className="font-bold">Openapi: acquisto dei nominativi</div>
+      <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
+        Il token si crea su console.openapi.com, servizio Company. Resta su questo PC, cifrato dalla protezione di Windows, e non entra nei file esportati.
+      </p>
+      <div className="mt-2 text-xs">
+        Stato:{' '}
+        {stato.haToken ? (
+          <b style={{ color: 'var(--good-ink)' }}>token inserito, termina con {stato.tokenFinale}{stato.cifrato ? ', cifrato' : ''}</b>
+        ) : (
+          <b>nessun token, l'app usa dati dimostrativi</b>
+        )}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <input id="token-openapi" className="input" type="password" value={token} onChange={(e) => setToken(e.target.value)} placeholder={stato.haToken ? 'Incolla un nuovo token per sostituirlo' : 'Incolla il token Openapi'} />
+        <button
+          className="btn btn-primary"
+          disabled={!token.trim()}
+          onClick={async () => {
+            setStato(await desktop!.salvaImpostazioni({ token }))
+            setToken('')
+            setMsg('Token salvato')
+          }}
+        >
+          Salva
+        </button>
+      </div>
+      <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={stato.sandbox}
+          onChange={async (e) => {
+            setStato(await desktop!.salvaImpostazioni({ sandbox: e.target.checked }))
+            setMsg(e.target.checked ? 'Ambiente di prova attivo: nessun costo' : 'Dati veri attivi: gli acquisti si pagano')
+          }}
+        />
+        <span>
+          <b>Ambiente di prova</b>: dati di esempio di Openapi, senza costi. Toglilo per comprare i dati veri.
+        </span>
+      </label>
+      {stato.haToken && (
+        <button className="btn mt-2 !py-1 text-xs" onClick={async () => { setStato(await desktop!.salvaImpostazioni({ token: '' })); setMsg('Token rimosso') }}>
+          Rimuovi token
+        </button>
+      )}
+      {msg && <div className="mt-2"><Avviso tipo="ok">{msg}</Avviso></div>}
+      <div className="mt-3 text-[11px]" style={{ color: 'var(--muted)' }}>Versione {stato.versione} · dati in {stato.cartellaDati}</div>
+    </div>
   )
 }

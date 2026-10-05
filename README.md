@@ -31,18 +31,27 @@ Sulla **mappa** si può:
 
 La cernita nell'Excel funziona senza macro. Abbina per partita IVA, poi per nome uguale a meno di forma giuridica, punteggiatura e spazi. Il confronto dentro l'app è più fine: riconosce anche nomi scritti in modo diverso e lo stesso indirizzo.
 
-## App locale da scaricare (consigliata)
+## Applicazione per PC (Windows)
 
-Il pacchetto `CustomerMapPotential.zip` contiene tutto: l'app compilata, i dati e un piccolo server in Python.
+Due file, da scegliere:
 
-1. Serve Python 3, lo stesso dell'ufficio trading. Se manca: python.org, spuntando "Add Python to PATH".
-2. Estrai lo zip in una cartella, per esempio `Documenti\CustomerMapPotential`.
-3. Doppio clic su **Avvia Customer Map.bat**. Si apre il browser su http://localhost:8790.
-4. Per acquistare i nominativi, apri `impostazioni.txt` con il Blocco note e incolla il token Openapi.
+- **Customer-Map-Potential-Setup-1.0.0.exe**: installatore. Crea l'icona sul desktop e nel menu Start, si disinstalla da "App installate".
+- **Customer-Map-Potential-Portable-1.0.0.exe**: versione portatile, si avvia con doppio clic senza installare.
 
-L'app risponde solo dal PC su cui gira: dagli altri computer della rete non si raggiunge. Il token resta in `impostazioni.txt`.
+Al primo avvio Windows può mostrare "Windows ha protetto il PC": il programma non ha una firma digitale a pagamento. Clic su **Ulteriori informazioni**, poi **Esegui comunque**.
 
-Per rifare il pacchetto dopo una modifica: `npm run pacchetto`. Il file finisce in `pacchetto/`.
+- I dati di comuni, veicoli e settori sono dentro il programma. Dealer, acquisti e liste clienti restano sul PC, nella cartella che si apre da **File → Apri la cartella dei dati**.
+- Il token Openapi si inserisce in **Impostazioni**. Viene cifrato con la protezione di Windows e la pagina non lo vede mai.
+- Internet serve solo per lo sfondo stradale, la ricerca indirizzi, OpenStreetMap e Openapi.
+- L'app non apre porte di rete: dagli altri PC non si raggiunge.
+
+Per ricreare i file: `npm run installer` su Windows, oppure dalla scheda **Actions** di GitHub, flusso "Installer Windows", che crea installatore e versione portatile, li installa, avvia l'app e ne controlla il funzionamento.
+
+Per provare l'app sul proprio PC durante lo sviluppo: `npm run desktop`.
+
+## App locale con Python (alternativa)
+
+Il pacchetto `CustomerMapPotential.zip`, creato con `npm run pacchetto`, fa la stessa cosa con un piccolo server Python e il browser. Resta utile su PC dove non si possono installare programmi.
 
 ## Avvio per sviluppo
 

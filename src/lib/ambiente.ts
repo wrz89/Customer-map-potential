@@ -23,3 +23,22 @@ export async function salvaFile(nome: string, blob: Blob): Promise<void> {
   a.click()
   setTimeout(() => URL.revokeObjectURL(a.href), 2000)
 }
+
+/* ---------- applicazione per PC (Electron) ---------- */
+
+export interface StatoDesktop {
+  haToken: boolean
+  tokenFinale: string
+  cifrato: boolean
+  sandbox: boolean
+  versione: string
+  cartellaDati: string
+}
+
+interface DesktopApi {
+  leggiImpostazioni: () => Promise<StatoDesktop>
+  salvaImpostazioni: (v: { token?: string; sandbox?: boolean }) => Promise<StatoDesktop>
+}
+
+/** Presente solo dentro l'applicazione per PC. */
+export const desktop: DesktopApi | undefined = (window as unknown as { cmpDesktop?: DesktopApi }).cmpDesktop
