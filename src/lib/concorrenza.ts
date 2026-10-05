@@ -58,7 +58,8 @@ export interface RisultatoConcorrenza {
   area?: AreaOsm
 }
 
-const PREFISSO = 'cmp.osm.v2.'
+// v3: la ricerca comprende anche craft=car_repair (officine mappate come artigiani); le copie vecchie si ignorano
+const PREFISSO = 'cmp.osm.v3.'
 const chiave = (lat: number, lon: number, r: number) => `${PREFISSO}${lat.toFixed(3)}.${lon.toFixed(3)}.${r}`
 
 /** Si carica un'area più larga di quella chiesta: spostare un po' il centro o allargare il raggio non rifà la richiesta. */
@@ -125,7 +126,7 @@ export async function caricaConcorrenzaOsm(lat: number, lon: number, raggioKm: n
   }
   const rc = raggioDaCaricare(raggioKm)
   const m = Math.round(rc * 1000)
-  const q = `[out:json][timeout:90];(nwr["shop"="tyres"](around:${m},${lat},${lon});nwr["shop"="car_repair"](around:${m},${lat},${lon});nwr["craft"="tyres"](around:${m},${lat},${lon}););out center tags;`
+  const q = `[out:json][timeout:90];(nwr["shop"="tyres"](around:${m},${lat},${lon});nwr["shop"="car_repair"](around:${m},${lat},${lon});nwr["craft"="car_repair"](around:${m},${lat},${lon});nwr["craft"="tyres"](around:${m},${lat},${lon}););out center tags;`
   let ultimoErrore = ''
   for (const url of SERVER) {
     try {

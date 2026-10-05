@@ -213,6 +213,7 @@ interface Props {
   onSpostaCentro: (lat: number, lon: number, nome?: string) => void
   onApriComune?: (codice: string) => void
   onSelezionaDealer?: (id: string) => void
+  onRiprovaOsm?: () => void
 }
 
 export default function MapView(props: Props) {
@@ -222,7 +223,7 @@ export default function MapView(props: Props) {
   const mapRef = useRef<MLMap | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
   const [pronta, setPronta] = useState(0)
-  const [livelli, setLivelli] = useState<Record<Livello, boolean>>({ comuni: true, anelli: true, concorrenza: true, officine: false, aziende: true, dealer: true })
+  const [livelli, setLivelli] = useState<Record<Livello, boolean>>({ comuni: true, anelli: true, concorrenza: true, officine: true, aziende: true, dealer: true })
   const [esplora, setEsplora] = useState(false)
   const [coloraPer, setColoraPer] = useState<'flotta' | 'stato'>('flotta')
   const [flotte, setFlotte] = useState<Record<string, boolean>>({ Alta: true, Media: true, Bassa: true, 'n.d.': true })
@@ -758,13 +759,22 @@ export default function MapView(props: Props) {
                     <span className="num" style={{ color: 'var(--muted)' }}>{n0(r.n)}</span>
                   </div>
                 ))}
-                <div className="mt-1" style={{ color: 'var(--muted)' }}>
-                  {zona.infoConcorrenza?.registro
-                    ? 'Fonti: Registro Imprese e OpenStreetMap.'
-                    : zona.infoConcorrenza?.stato === 'carico'
-                      ? 'Carico OpenStreetMap…'
-                      : 'Solo OpenStreetMap: parziale. Elenco completo in Territorio.'}
-                </div>
+                {zona.infoConcorrenza?.stato === 'errore' ? (
+                  <div className="mt-1 rounded-lg border p-2" style={{ borderColor: 'var(--warn)', color: 'var(--ink)' }}>
+                    <b>OpenStreetMap non risponde.</b> {zona.infoConcorrenza.errore}
+                    {props.onRiprovaOsm && (
+                      <button className="btn mt-1.5 !py-0.5 text-[11px]" onClick={props.onRiprovaOsm}>Riprova</button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1" style={{ color: 'var(--muted)' }}>
+                    {zona.infoConcorrenza?.registro
+                      ? 'Fonti: Registro Imprese e OpenStreetMap.'
+                      : zona.infoConcorrenza?.stato === 'carico'
+                        ? 'Carico OpenStreetMap…'
+                        : 'Solo OpenStreetMap: parziale. Elenco completo in Territorio.'}
+                  </div>
+                )}
               </div>
             )}
 

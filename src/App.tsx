@@ -556,6 +556,7 @@ export default function App() {
                       setComuneEvid(c)
                       setTab('territorio')
                     }}
+                    onRiprovaOsm={() => zona && caricaOsm(zona, true)}
                     onSelezionaDealer={(id) => {
                       const d = dealer.find((x) => x.id === id)
                       if (d) seleziona(d)
