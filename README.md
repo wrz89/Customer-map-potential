@@ -2,11 +2,13 @@
 
 ## Scarica il programma per Windows
 
-**[Scarica Customer-Map-Potential-Windows.zip](https://github.com/wrz89/Customer-map-potential/releases/latest/download/Customer-Map-Potential-Windows.zip)**: estrai lo zip e fai doppio clic su `Customer-Map-Potential-Portable.exe`. Non serve installare nulla.
+**[Scarica Customer-Map-Potential-Windows.zip](https://github.com/wrz89/customer-map-potential-download/releases/latest/download/Customer-Map-Potential-Windows.zip)**: estrai lo zip e fai doppio clic su `Customer-Map-Potential-Portable.exe`. Non serve installare nulla.
 
-Oppure **[Customer-Map-Potential-Setup.exe](https://github.com/wrz89/Customer-map-potential/releases/latest/download/Customer-Map-Potential-Setup.exe)** per installarlo con icona sul desktop e nel menu Start. Tutte le versioni sono nella pagina [Releases](https://github.com/wrz89/Customer-map-potential/releases).
+Oppure **[Customer-Map-Potential-Setup.exe](https://github.com/wrz89/customer-map-potential-download/releases/latest/download/Customer-Map-Potential-Setup.exe)** per installarlo con icona sul desktop e nel menu Start. Tutte le versioni sono nella pagina [Releases](https://github.com/wrz89/customer-map-potential-download/releases).
 
-**Si aggiorna da solo.** Il programma, installato o portatile, all'avvio e ogni 6 ore controlla l'ultima release di questa repo. Se trova una versione nuova la scarica e la installa al riavvio; si può controllare anche da menu Aiuto → Verifica aggiornamenti. Ogni modifica su `main` crea una nuova release con versione `1.0.<numero build>`, e la CI prova che la versione precedente, installata e portatile, passi davvero a quella nuova.
+**Si aggiorna da solo.** Il programma, installato o portatile, all'avvio e ogni 6 ore controlla l'ultima release della repo pubblica dei download. Se trova una versione nuova la scarica e la installa al riavvio; si può controllare anche da menu Aiuto → Verifica aggiornamenti. Ogni modifica su `main` crea una nuova release con versione `1.0.<numero build>`, e la CI prova che la versione precedente, installata e portatile, passi davvero a quella nuova.
+
+Il codice resta in questa repo privata; i file da scaricare stanno nella repo pubblica [wrz89/customer-map-potential-download](https://github.com/wrz89/customer-map-potential-download), dove la CI pubblica ogni versione usando il secret `RELEASE_TOKEN` (token con permesso Contents in scrittura solo su quella repo).
 
 Il pulsante verde "Code → Download ZIP" scarica invece il codice sorgente, che serve solo per modificare il programma.
 

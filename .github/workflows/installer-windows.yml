@@ -13,6 +13,10 @@ jobs:
   windows:
     runs-on: windows-latest
     timeout-minutes: 40
+    env:
+      # il codice resta privato: le versioni si pubblicano nella repo pubblica dei download
+      DOWNLOAD_REPO: wrz89/customer-map-potential-download
+      HA_TOKEN: ${{ secrets.RELEASE_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,8 +67,13 @@ jobs:
 
       # Su main: release scaricabile, con nomi fissi così il link "latest" non cambia mai.
       # latest.yml + blockmap servono al programma installato, il .exe portatile al programma portatile.
+      - name: Manca il token per pubblicare
+        if: github.ref == 'refs/heads/main' && env.HA_TOKEN != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::warning::Secret RELEASE_TOKEN mancante: installatore creato e provato, ma non pubblicato in $env:DOWNLOAD_REPO"
       - name: Prepara i file della release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && env.HA_TOKEN == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -76,9 +85,9 @@ jobs:
           Copy-Item release\Customer-Map-Potential-Setup.exe, release\Customer-Map-Potential-Setup.exe.blockmap, release\latest.yml, release\Customer-Map-Potential-Portable.exe pubblica\
           Get-ChildItem pubblica
           # versione precedente (l'attuale "latest", prima di pubblicare questa), per provare l'aggiornamento vero
-          $prec = gh release view --repo ${{ github.repository }} --json tagName -q .tagName
+          $prec = gh release view --repo $env:DOWNLOAD_REPO --json tagName -q .tagName
           Write-Host "Versione precedente: $prec"
-          gh release download $prec --repo ${{ github.repository }} -D precedente -p latest.yml -p Customer-Map-Potential-Setup.exe -p Customer-Map-Potential-Portable.exe
+          if ($prec) { gh release download $prec --repo $env:DOWNLOAD_REPO -D precedente -p latest.yml -p Customer-Map-Potential-Setup.exe -p Customer-Map-Potential-Portable.exe }
           $global:LASTEXITCODE = 0  # una versione vecchia senza questi file non deve bloccare la pubblicazione
           if ((Test-Path precedente\latest.yml) -and (Test-Path precedente\Customer-Map-Potential-Portable.exe)) {
             "PROVA_AGGIORNAMENTO=1" | Out-File $env:GITHUB_ENV -Append
@@ -86,9 +95,11 @@ jobs:
             Write-Host "La versione $prec non ha l'aggiornamento automatico: prova saltata"
           }
       - name: Pubblica la release
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && env.HA_TOKEN == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          repository: ${{ env.DOWNLOAD_REPO }}
+          token: ${{ secrets.RELEASE_TOKEN }}
           tag_name: v${{ env.VERSIONE }}
           name: Customer Map Potential ${{ env.VERSIONE }}
           make_latest: true
@@ -111,7 +122,7 @@ jobs:
 
       # Prova reale: la versione precedente, installata e portatile, deve aggiornarsi a questa
       - name: Prova l'aggiornamento automatico
-        if: github.ref == 'refs/heads/main' && env.PROVA_AGGIORNAMENTO == '1'
+        if: github.ref == 'refs/heads/main' && env.HA_TOKEN == 'true' && env.PROVA_AGGIORNAMENTO == '1'
         shell: pwsh
         run: |
           function Attendi-Versione($exe) {
@@ -125,9 +136,8 @@ jobs:
           }
           # diagnosi: gli indirizzi letti dalle versioni installate
           foreach ($u in @(
-            'https://github.com/${{ github.repository }}/releases.atom',
-            'https://github.com/wrz89/customer-map-potential/releases.atom',
-            'https://github.com/${{ github.repository }}/releases/latest/download/latest.yml')) {
+            "https://api.github.com/repos/$env:DOWNLOAD_REPO/releases/latest",
+            "https://github.com/$env:DOWNLOAD_REPO/releases/latest/download/latest.yml")) {
             try { $r = Invoke-WebRequest $u -UseBasicParsing; Write-Host "$($r.StatusCode) $u" } catch { Write-Host "ERRORE $u : $($_.Exception.Message)" }
           }
           $cartella = Split-Path $env:EXE

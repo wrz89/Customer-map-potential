@@ -95,7 +95,7 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "https://github.com/wrz89/Customer-map-potential/releases/latest/download"
+        "url": "https://github.com/wrz89/customer-map-potential-download/releases/latest/download"
       }
     ]
   },
