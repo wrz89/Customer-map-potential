@@ -84,3 +84,30 @@ describe('calcolaZona su Pavia', () => {
     expect(Math.abs(addCat - addDiv)).toBeLessThan(1)
   })
 })
+
+describe('guida Telemaco: codici e stima per zona', async () => {
+  const { PACCHETTI_ATECO, codiciPacchetti, stimaPacchetto, costoTelemaco } = await import('../src/lib/atecoTelemaco')
+  it('i codici non si ripetono e il gommista 45.20.40 non è tra i clienti', () => {
+    const tutti = codiciPacchetti(PACCHETTI_ATECO.map((p) => p.id))
+    expect(new Set(tutti).size).toBe(tutti.length)
+    expect(tutti).toContain('43')
+    expect(tutti).toContain('45')
+    expect(tutti).not.toContain('45.20.40')
+  })
+  it('stima le imprese dai dati ISTAT con la soglia di addetti del pacchetto', async () => {
+    const z = await calcolaZona(45.1847, 9.1582, 5)
+    const [mestiere, auto, media, commerciali] = PACCHETTI_ATECO.map((p) => stimaPacchetto(z, p))
+    expect(mestiere.imprese).toBeGreaterThan(auto.imprese)
+    expect(mestiere.parziale).toBe(true) // 77.1, 85.53, 56.2 non contano nella stima
+    expect(auto.parziale).toBe(false)
+    // soglia 10+ e 50+: meno imprese che con tutte
+    const tutteMedia = z.settori.filter((s) => ['46', '33', '35', '86'].includes(s.divisione)).reduce((a, s) => a + s.unitaLocali, 0)
+    expect(media.imprese).toBeLessThan(tutteMedia + 1)
+    expect(commerciali.imprese).toBeGreaterThanOrEqual(0)
+  })
+  it('costo: 5 € a elenco più per impresa, zero se non ce ne sono', () => {
+    expect(costoTelemaco(100, 'indirizzi')).toBeCloseTo(7)
+    expect(costoTelemaco(100, 'esteso')).toBeCloseTo(17)
+    expect(costoTelemaco(0, 'esteso')).toBe(0)
+  })
+})

@@ -5,6 +5,7 @@ import { acquistaOpenapi, generaDemo, importaElenco, stimaOpenapi, type Azienda,
 import { distKm, eur, n0 } from '../lib/fmt'
 import type { Acquisto, Dealer } from '../lib/store'
 import type { Zona } from '../lib/zone'
+import { GuidaTelemaco } from './GuidaTelemaco'
 import { Avviso, BottoneConferma, FlottaBadge, Sezione, Tabella, type Colonna } from './ui'
 
 interface Props {
@@ -227,6 +228,8 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
           </div>
         </div>
       </div>
+
+      <GuidaTelemaco zona={zona} />
 
       {errore && <Avviso tipo="errore">{errore}</Avviso>}
       {info && <Avviso tipo="ok">{info}</Avviso>}
