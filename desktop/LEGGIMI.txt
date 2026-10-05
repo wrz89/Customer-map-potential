@@ -21,7 +21,8 @@ AGGIORNAMENTI
 - Dealer, acquisti e liste clienti non vengono toccati.
 
 PRIMI PASSI
-- Impostazioni > Elenco dealer > Importa: un Excel con colonne Nome e Indirizzo.
+- Impostazioni > Elenco dealer > Importa: un Excel con colonne
+  Ragione Sociale, Indirizzo, Cap, Città.
 - Impostazioni > Openapi: incolla il token per acquistare i nominativi.
   Lascia spuntato "Ambiente di prova" finché non vuoi comprare dati veri.
 - Ogni dealer: mappa, territorio, età del parco, settori, concorrenza,

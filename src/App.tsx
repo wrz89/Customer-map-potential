@@ -309,7 +309,7 @@ export default function App() {
                 style={on ? { background: 'var(--brand)', color: '#fff' } : { color: 'var(--ink)' }}
               >
                 <div className={`truncate text-sm ${on ? 'font-bold' : 'font-medium'}`} style={on && tema === 'dark' ? { color: '#0b1220' } : undefined}>{d.nome}</div>
-                <div className="truncate text-[11px]" style={{ color: on ? (tema === 'dark' ? '#1b2a40' : '#c8d6ea') : 'var(--muted)' }}>{d.indirizzo}</div>
+                <div className="truncate text-[11px]" style={{ color: on ? (tema === 'dark' ? '#1b2a40' : '#c8d6ea') : 'var(--muted)' }}>{d.posizione && d.posizione !== 'indirizzo' ? '⚠ posizione approssimativa · ' : ''}{d.indirizzo}</div>
               </button>
             )
           })}
@@ -546,7 +546,10 @@ export default function App() {
             salvaImpostazioni(i)
           }}
           onImportaDealer={(nuovi) => {
-            const tutti = [...dealer.filter((d) => !d.id.startsWith('esempio-')), ...nuovi]
+            // stesso nome = stesso dealer: reimportare aggiorna invece di duplicare
+            const chiave = (d: Dealer) => d.nome.toLowerCase().replace(/[^a-z0-9]/g, '')
+            const nuoviNomi = new Set(nuovi.map(chiave))
+            const tutti = [...dealer.filter((d) => !d.id.startsWith('esempio-') && !nuoviNomi.has(chiave(d))), ...nuovi]
             aggiornaDealer(tutti)
             if (nuovi[0]) seleziona(nuovi[0])
           }}

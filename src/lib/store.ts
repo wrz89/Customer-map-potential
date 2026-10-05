@@ -11,6 +11,8 @@ export interface Dealer {
   lon: number
   raggioKm: number
   note?: string
+  /** come è stata trovata la posizione all'import: se non 'indirizzo', va controllata sulla mappa */
+  posizione?: 'indirizzo' | 'cap' | 'comune'
 }
 
 const K_DEALER = 'cmp.dealer.v1'
@@ -123,6 +125,23 @@ export interface RisultatoGeocodifica {
   nome: string
   lat: number
   lon: number
+}
+
+/** Ricerca a campi separati (via, CAP, comune): più affidabile del testo libero per gli elenchi Excel. */
+export async function geocodificaCampi(q: { via?: string; cap?: string; citta?: string; testo?: string }): Promise<RisultatoGeocodifica[]> {
+  if (q.testo) return geocodifica(q.testo)
+  const u = new URL('https://nominatim.openstreetmap.org/search')
+  if (q.via) u.searchParams.set('street', q.via)
+  if (q.cap) u.searchParams.set('postalcode', q.cap)
+  if (q.citta) u.searchParams.set('city', q.citta)
+  u.searchParams.set('country', 'Italia')
+  u.searchParams.set('format', 'jsonv2')
+  u.searchParams.set('limit', '1')
+  u.searchParams.set('accept-language', 'it')
+  const r = await fetch(u)
+  if (!r.ok) throw new Error('Ricerca indirizzo non disponibile')
+  const j = (await r.json()) as { display_name: string; lat: string; lon: string }[]
+  return j.map((x) => ({ nome: x.display_name, lat: Number(x.lat), lon: Number(x.lon) }))
 }
 
 export async function geocodifica(q: string): Promise<RisultatoGeocodifica[]> {

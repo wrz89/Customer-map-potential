@@ -1,8 +1,9 @@
 import { Download, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { desktop, type StatoAggiornamento, type StatoDesktop } from '../lib/ambiente'
-import { indovinaColonne, leggiTabella, numero } from '../lib/leggiFile'
-import { geocodifica, type Dealer, type Impostazioni as Imp } from '../lib/store'
+import { indirizzoCompleto, leggiRigheDealer, ricercheDealer } from '../lib/importaDealer'
+import { leggiTabella } from '../lib/leggiFile'
+import { geocodificaCampi, type Dealer, type Impostazioni as Imp } from '../lib/store'
 import { Avviso, Modale } from './ui'
 
 export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }: {
@@ -36,29 +37,44 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
         return
       }
       const { intestazioni, righe } = await leggiTabella(file)
-      const m = indovinaColonne(intestazioni)
-      const colNome = intestazioni.find((h) => /(dealer|nome|ragione|punto)/i.test(h)) ?? m.ragioneSociale
-      const colLat = intestazioni.find((h) => /^lat/i.test(h))
-      const colLon = intestazioni.find((h) => /^(lon|lng)/i.test(h))
-      const colRaggio = intestazioni.find((h) => /raggio/i.test(h))
-      if (!colNome || !m.indirizzo) throw new Error(`Servono almeno le colonne Nome e Indirizzo. Colonne lette: ${intestazioni.join(', ')}`)
+      const elenco = leggiRigheDealer(intestazioni, righe)
+      if (!elenco.length) throw new Error('Nessun dealer nel file: la prima riga deve avere i titoli Ragione Sociale, Indirizzo, Cap, Città')
       const out: Dealer[] = []
-      for (const [i, r] of righe.entries()) {
-        const indirizzo = [r[m.indirizzo], m.comune ? r[m.comune] : ''].filter(Boolean).join(', ')
-        let lat = colLat ? numero(r[colLat]) : null
-        let lon = colLon ? numero(r[colLon]) : null
+      const approssimati: string[] = []
+      const mancanti: string[] = []
+      for (const [i, r] of elenco.entries()) {
+        const indirizzo = indirizzoCompleto(r)
+        let lat = r.lat
+        let lon = r.lon
+        let posizione: Dealer['posizione'] = 'indirizzo'
         if (lat === null || lon === null) {
-          setStato(`Cerco l'indirizzo ${i + 1} di ${righe.length}: ${indirizzo}`)
-          const g = await geocodifica(indirizzo).catch(() => [])
-          await new Promise((res) => setTimeout(res, 1100)) // limite Nominatim: 1 richiesta al secondo
-          if (!g.length) continue
-          lat = g[0].lat
-          lon = g[0].lon
+          setStato(`Cerco ${i + 1} di ${elenco.length}: ${r.nome}`)
+          for (const t of ricercheDealer(r)) {
+            const g = await geocodificaCampi(t.q).catch(() => [])
+            await new Promise((res) => setTimeout(res, 1100)) // limite Nominatim: 1 richiesta al secondo
+            if (g.length) {
+              lat = g[0].lat
+              lon = g[0].lon
+              posizione = t.precisione
+              break
+            }
+          }
+          if (lat === null || lon === null) {
+            mancanti.push(r.nome)
+            continue
+          }
+          if (posizione !== 'indirizzo') approssimati.push(`${r.nome} (${posizione === 'cap' ? 'centro del CAP' : 'centro del comune'})`)
         }
-        out.push({ id: `d-${Date.now()}-${i}`, nome: r[colNome], indirizzo, lat, lon, raggioKm: (colRaggio && numero(r[colRaggio])) || 15 })
+        out.push({ id: `d-${Date.now()}-${i}`, nome: r.nome, indirizzo, lat, lon, raggioKm: r.raggioKm || 15, posizione })
       }
       onImportaDealer(out)
-      setStato(`Importati ${out.length} dealer su ${righe.length}${out.length < righe.length ? ': quelli mancanti hanno un indirizzo non trovato' : ''}`)
+      setStato(
+        [
+          `Importati ${out.length} dealer su ${elenco.length}.`,
+          approssimati.length ? `Posizione approssimativa, correggila con la matita accanto al nome del dealer: ${approssimati.join('; ')}.` : '',
+          mancanti.length ? `Non trovati, aggiungili a mano: ${mancanti.join('; ')}.` : '',
+        ].filter(Boolean).join(' '),
+      )
     } catch (e) {
       setErrore((e as Error).message)
     } finally {
@@ -86,7 +102,7 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
         <div>
           <div className="font-bold">Elenco dealer</div>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
-            Importa da Excel o CSV con colonne Nome e Indirizzo (Comune, Lat, Lon e Raggio facoltative): gli indirizzi si cercano da soli, uno al secondo. Esporta per passare l'elenco a un collega.
+            Importa da Excel o CSV con le colonne <b>Ragione Sociale, Indirizzo, Cap, Città</b> (Provincia, Lat, Lon e Raggio facoltative). Gli indirizzi si cercano da soli, uno al secondo: se una via non si trova, il dealer va al centro del CAP o del comune e te lo segnalo. Reimportando lo stesso file i dealer si aggiornano, non si duplicano. Esporta per passare l'elenco a un collega.
           </p>
           <div className="mt-2 flex gap-2">
             <button className="btn" onClick={() => fileRef.current?.click()}>
