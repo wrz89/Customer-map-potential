@@ -13,6 +13,12 @@ export interface Dealer {
   note?: string
   /** come è stata trovata la posizione all'import: se non 'indirizzo', va controllata sulla mappa */
   posizione?: 'indirizzo' | 'cap' | 'comune'
+  /** campi dell'import, per affinare la posizione in sottofondo */
+  via?: string
+  cap?: string
+  citta?: string
+  /** posizione esatta già cercata (trovata o no): non si riprova */
+  cercato?: boolean
 }
 
 const K_DEALER = 'cmp.dealer.v1'
@@ -126,6 +132,36 @@ export interface RisultatoGeocodifica {
   lat: number
   lon: number
 }
+
+/** Memoria delle ricerche già fatte: reimportare lo stesso elenco non rifà le richieste. */
+const K_GEO = 'cmp.geocodifica.v1'
+function memoriaGeo(): Record<string, [number, number] | 0> {
+  try {
+    return JSON.parse(localStorage.getItem(K_GEO) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+/** Come geocodificaCampi, con memoria delle risposte (anche di quelle vuote). */
+export async function cercaPosizione(q: { via?: string; cap?: string; citta?: string; testo?: string }): Promise<{ lat: number; lon: number } | null> {
+  const chiave = JSON.stringify(q)
+  const mem = memoriaGeo()
+  if (chiave in mem) {
+    const v = mem[chiave]
+    return v ? { lat: v[0], lon: v[1] } : null
+  }
+  const r = await geocodificaCampi(q)
+  try {
+    mem[chiave] = r[0] ? [r[0].lat, r[0].lon] : 0
+    localStorage.setItem(K_GEO, JSON.stringify(mem))
+  } catch {
+    /* memoria piena o non disponibile: si rifarà la richiesta */
+  }
+  return r[0] ? { lat: r[0].lat, lon: r[0].lon } : null
+}
+
+export const giaCercata = (q: object) => JSON.stringify(q) in memoriaGeo()
 
 /** Ricerca a campi separati (via, CAP, comune): più affidabile del testo libero per gli elenchi Excel. */
 export async function geocodificaCampi(q: { via?: string; cap?: string; citta?: string; testo?: string }): Promise<RisultatoGeocodifica[]> {

@@ -40,3 +40,35 @@ describe('import dealer', () => {
     expect(() => leggiRigheDealer(['Codice', 'Note'], [])).toThrow(/Ragione Sociale, Indirizzo, Cap e Città/)
   })
 })
+
+describe('import veloce: comune dai dati locali', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { indiceComuni, trovaComune, affinaPosizione, rigaDaDealer } = await import('../src/lib/importaDealer')
+  const comuni = JSON.parse(readFileSync('public/data/comuni.json', 'utf-8'))
+  const indice = indiceComuni(comuni)
+  const riga = (citta: string, provincia = '') => ({ ...leggiRigheDealer(intestazioni, righe)[0], citta, provincia })
+
+  it('trova i comuni anche con nomi in maiuscolo, accenti, nomi doppi e d’uso', () => {
+    expect(trovaComune(riga('Parma'), indice)?.n).toBe('Parma')
+    expect(trovaComune(riga('Sgonico'), indice)?.n).toBe('Sgonico-Zgonik')
+    expect(trovaComune(riga('Bolzano', 'BZ'), indice)?.n).toBe('Bolzano/Bozen')
+    expect(trovaComune(riga('Reggio Emilia'), indice)?.n).toBe("Reggio nell'Emilia")
+    expect(trovaComune(riga('Forli'), indice)?.n).toBe('Forlì')
+    expect(trovaComune(riga('Pavia (PV)'), indice)?.p).toBe('PV')
+    expect(trovaComune(riga('Mestre'), indice)).toBeNull() // frazione: si cerca in rete
+  })
+
+  it('affina la via con al massimo tre richieste, senza attese per le risposte in memoria', async () => {
+    const chieste: string[] = []
+    const p = await affinaPosizione(
+      rigaDaDealer({ nome: 'X', via: 'Zona Artigianale Zgonik Via Stazione di Prosecco 12', cap: '34010', citta: 'Sgonico' }),
+      async (q) => {
+        chieste.push(JSON.stringify(q))
+        return q.testo === 'Zona Artigianale Sgonico' ? { lat: 45.7, lon: 13.7 } : null
+      },
+      () => true,
+    )
+    expect(p).toEqual({ lat: 45.7, lon: 13.7 })
+    expect(chieste.length).toBeLessThanOrEqual(3)
+  })
+})

@@ -101,3 +101,87 @@ export function ricercheDealer(r: RigaDealer): { q: Ricerca; precisione: Precisi
   else if (r.cap) out.push({ q: { cap: r.cap }, precisione: 'cap' })
   return out
 }
+
+/* ---------- posizione immediata: comune dai dati ISTAT già nel programma ---------- */
+
+export const chiaveNome = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+// nomi d'uso diversi dal nome ufficiale ISTAT
+const ALIAS: Record<string, string> = {
+  reggioemilia: 'reggionellemilia',
+  reggiocalabria: 'reggiodicalabria',
+  bolzano: 'bolzanobozen',
+}
+
+export interface ComuneMinimo {
+  n: string
+  p: string
+  lat: number
+  lon: number
+}
+
+/** Indice nome → comuni: nome ufficiale, più le parti dei nomi doppi ("Sgonico-Zgonik", "Bolzano/Bozen"). */
+export function indiceComuni<T extends ComuneMinimo>(comuni: T[]): Map<string, T[]> {
+  const m = new Map<string, T[]>()
+  const metti = (k: string, c: T) => {
+    if (!k) return
+    const l = m.get(k)
+    if (!l) m.set(k, [c])
+    else if (!l.includes(c)) l.push(c)
+  }
+  for (const c of comuni) metti(chiaveNome(c.n), c)
+  for (const c of comuni) {
+    for (const parte of c.n.split(/[/-]/)) {
+      const k = chiaveNome(parte)
+      if (k.length > 3 && !m.has(k)) metti(k, c)
+    }
+  }
+  return m
+}
+
+/** Il comune della riga: per nome, e tra gli omonimi per provincia. */
+export function trovaComune<T extends ComuneMinimo>(r: RigaDealer, indice: Map<string, T[]>): T | null {
+  const tra = r.citta.match(/\(([A-Za-z]{2})\)\s*$/)
+  const prov = (tra?.[1] ?? r.provincia).toUpperCase()
+  let k = chiaveNome(r.citta.replace(/\([^)]*\)\s*$/, ''))
+  k = ALIAS[k] ?? k
+  const l = indice.get(k)
+  if (!l?.length) return null
+  return (prov.length === 2 && l.find((c) => c.p === prov)) || l[0]
+}
+
+/* ---------- posizione esatta, in sottofondo ---------- */
+
+export type Cercatore = (q: Ricerca) => Promise<{ lat: number; lon: number } | null>
+
+/**
+ * Prova solo le ricerche "a indirizzo" (massimo tre): il comune lo abbiamo già.
+ * Tra una richiesta in rete e l'altra si aspetta (limite del servizio: una al secondo);
+ * le ricerche già in memoria non aspettano.
+ */
+export async function affinaPosizione(r: RigaDealer, cerca: Cercatore, inMemoria: (q: Ricerca) => boolean, attesa = 1100) {
+  const prove = ricercheDealer(r).filter((t) => t.precisione === 'indirizzo' && !t.q.testo?.includes(','))
+  for (const [i, t] of prove.entries()) {
+    if (i && !inMemoria(t.q)) await new Promise((ok) => setTimeout(ok, attesa))
+    const p = await cerca(t.q)
+    if (p) return p
+  }
+  return null
+}
+
+/** Riga dell'import ricostruita dai campi salvati nel dealer. */
+export const rigaDaDealer = (d: { nome: string; via?: string; cap?: string; citta?: string }): RigaDealer => ({
+  nome: d.nome,
+  via: d.via ?? '',
+  cap: d.cap ?? '',
+  citta: d.citta ?? '',
+  provincia: '',
+  lat: null,
+  lon: null,
+  raggioKm: null,
+})

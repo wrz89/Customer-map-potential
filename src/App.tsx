@@ -36,7 +36,9 @@ import {
   caricaClienti,
   caricaDealer,
   caricaImpostazioni,
+  cercaPosizione,
   eliminaAcquisto,
+  giaCercata,
   eliminaClienti,
   salvaAcquisto,
   salvaClienti,
@@ -46,6 +48,7 @@ import {
   type Dealer,
   type ListaClienti,
 } from './lib/store'
+import { affinaPosizione, rigaDaDealer } from './lib/importaDealer'
 import { calcolaZona, type Concorrente, type Zona } from './lib/zone'
 
 type Tab = 'mappa' | 'territorio' | 'settori' | 'aziende' | 'confronto'
@@ -229,6 +232,29 @@ export default function App() {
     salvaDealer(nuovi)
   }
 
+  // Via esatta dei dealer importati, in sottofondo: uno alla volta, una richiesta al secondo.
+  // Intanto il dealer è al centro del comune e si può già analizzare.
+  const daAffinare = dealer.filter((d) => d.posizione && d.posizione !== 'indirizzo' && !d.cercato && (d.via || d.citta))
+  const prossimoDaAffinare = DEMO ? undefined : daAffinare[0]
+  useEffect(() => {
+    const d = prossimoDaAffinare
+    if (!d) return
+    let annullato = false
+    const t = setTimeout(async () => {
+      const p = await affinaPosizione(rigaDaDealer(d), (q) => cercaPosizione(q).catch(() => null), giaCercata)
+      if (annullato) return
+      setDealer((prima) => {
+        const nuovi = prima.map((x) => (x.id === d.id ? { ...x, ...(p ? { lat: p.lat, lon: p.lon, posizione: 'indirizzo' as const } : {}), cercato: true } : x))
+        salvaDealer(nuovi)
+        return nuovi
+      })
+    }, 1100)
+    return () => {
+      annullato = true
+      clearTimeout(t)
+    }
+  }, [prossimoDaAffinare?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // aziende del dealer: unione degli acquisti, senza doppioni, dentro il raggio attuale
   const aziende = useMemo(() => {
     if (!sel) return []
@@ -296,6 +322,11 @@ export default function App() {
               <Plus size={14} /> Nuovo
             </button>
           </div>
+          {daAffinare.length > 0 && !DEMO && (
+            <div className="mt-2 text-[11px]" style={{ color: 'var(--muted)' }} title="Il servizio gratuito di ricerca indirizzi accetta una richiesta al secondo">
+              Cerco la via esatta: ne mancano {daAffinare.length}, circa {Math.max(1, Math.ceil((daAffinare.length * 2) / 60))} min. Intanto i dealer sono al centro del comune.
+            </div>
+          )}
           {dealer.length > 6 && <input className="input mt-2" placeholder="Cerca dealer" value={cercaDealer} onChange={(e) => setCercaDealer(e.target.value)} />}
         </div>
         <nav className="mt-2 max-h-48 flex-1 space-y-1 overflow-auto px-3 pb-3 lg:max-h-none">
