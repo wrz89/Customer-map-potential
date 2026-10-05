@@ -129,7 +129,20 @@ function creaFinestra() {
   // Prova automatica di avvio (usata dai controlli su Windows): --prova-avvio=percorso\esito.json
   const prova = process.argv.find((a) => a.startsWith('--prova-avvio='))
   if (prova) {
-    win.webContents.once('did-finish-load', () =>
+    // il programma parte senza dealer: al primo caricamento se ne salva uno (solo sul PC di prova),
+    // si ricarica e al secondo caricamento si controlla
+    let caricamenti = 0
+    win.webContents.on('did-finish-load', () => {
+      caricamenti++
+      if (caricamenti === 1)
+        win.webContents
+          .executeJavaScript(
+            `localStorage.setItem('cmp.dealer.v1', JSON.stringify([{ id: 'prova-avvio', nome: 'Prova avvio Pavia', indirizzo: 'Pavia', lat: 45.1847, lon: 9.1582, raggioKm: 15 }])); location.reload()`,
+          )
+          .catch(() => {})
+      else if (caricamenti === 2) controllaAvvio()
+    })
+    const controllaAvvio = () =>
       setTimeout(async () => {
         const esito = await win.webContents
           .executeJavaScript(
@@ -145,8 +158,7 @@ function creaFinestra() {
           .catch((e) => ({ errore: String(e) }))
         fs.writeFileSync(prova.split('=').slice(1).join('='), JSON.stringify(esito, null, 1), 'utf-8')
         app.exit(0)
-      }, 12000),
-    )
+      }, 12000)
   }
   return win
 }

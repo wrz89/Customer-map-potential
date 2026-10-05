@@ -24,18 +24,18 @@ export interface Dealer {
 const K_DEALER = 'cmp.dealer.v1'
 const K_IMPOST = 'cmp.impostazioni.v1'
 
-const DEALER_ESEMPIO: Dealer[] = [
-  { id: 'esempio-pavia', nome: 'SuperService Pavia (esempio)', indirizzo: 'Pavia, centro', lat: 45.1847, lon: 9.1582, raggioKm: 15, note: 'Punto di esempio: sostituisci con l\'indirizzo reale del dealer' },
-  // nella demo qualche punto in più, per vedere gli altri SuperService sulla mappa
-  ...(DEMO
-    ? [
+// dealer di esempio solo nella demo pubblicata; nel programma vero si parte da un elenco vuoto
+const DEALER_ESEMPIO: Dealer[] = DEMO
+  ? [
+      { id: 'esempio-pavia', nome: 'SuperService Pavia (esempio)', indirizzo: 'Pavia, centro', lat: 45.1847, lon: 9.1582, raggioKm: 15, note: 'Punto di esempio' },
+      ...[
         { id: 'esempio-milano-sud', nome: 'SuperService Milano Sud (esempio)', indirizzo: 'Rozzano, centro', lat: 45.381, lon: 9.155, raggioKm: 10 },
         { id: 'esempio-lodi', nome: 'SuperService Lodi (esempio)', indirizzo: 'Lodi, centro', lat: 45.3138, lon: 9.5037, raggioKm: 15 },
         { id: 'esempio-vigevano', nome: 'SuperService Vigevano (esempio)', indirizzo: 'Vigevano, centro', lat: 45.3168, lon: 8.8574, raggioKm: 15 },
         { id: 'esempio-bergamo', nome: 'SuperService Bergamo (esempio)', indirizzo: 'Bergamo, centro', lat: 45.6983, lon: 9.6773, raggioKm: 15 },
-      ]
-    : []),
-]
+      ],
+    ]
+  : []
 
 function leggi<T>(k: string, def: T): T {
   try {
@@ -53,7 +53,11 @@ function scrivi(k: string, v: unknown) {
   }
 }
 
-export const caricaDealer = () => leggi<Dealer[]>(K_DEALER, DEALER_ESEMPIO)
+// le versioni precedenti salvavano anche il dealer di esempio: fuori dal programma vero si toglie
+export const caricaDealer = () => {
+  const d = leggi<Dealer[]>(K_DEALER, DEALER_ESEMPIO)
+  return DEMO ? d : d.filter((x) => !x.id.startsWith('esempio-'))
+}
 export const salvaDealer = (d: Dealer[]) => scrivi(K_DEALER, d)
 
 export interface Impostazioni {

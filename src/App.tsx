@@ -7,6 +7,7 @@ import {
   Moon,
   Pencil,
   Plus,
+  Upload,
   Settings,
   Sun,
   Truck,
@@ -365,10 +366,17 @@ export default function App() {
         {!sel ? (
           <div className="m-auto max-w-md p-8 text-center">
             <div className="text-lg font-bold">Aggiungi il primo dealer</div>
-            <p className="mt-2 text-sm" style={{ color: 'var(--ink-2)' }}>Inserisci nome e indirizzo del punto vendita: l'app calcola il potenziale nel raggio scelto.</p>
-            <button className="btn btn-primary mt-4" onClick={() => setModale('nuovo')}>
-              <Plus size={15} /> Nuovo dealer
-            </button>
+            <p className="mt-2 text-sm" style={{ color: 'var(--ink-2)' }}>
+              Importa l'elenco dei dealer da Excel (colonne Ragione Sociale, Indirizzo, Cap, Città) oppure inseriscine uno a mano: l'app calcola il potenziale nel raggio scelto.
+            </p>
+            <div className="mt-4 flex justify-center gap-2">
+              <button className="btn btn-primary" onClick={() => setModale('impostazioni')}>
+                <Upload size={15} /> Importa da Excel
+              </button>
+              <button className="btn" onClick={() => setModale('nuovo')}>
+                <Plus size={15} /> Nuovo dealer
+              </button>
+            </div>
           </div>
         ) : (
           <>
