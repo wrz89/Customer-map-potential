@@ -79,7 +79,7 @@ export async function gestisci(r: RichiestaAziende, env: Ambiente) {
   if (!env.OPENAPI_TOKEN) {
     return { demo: true, messaggio: 'Token Openapi non configurato: l\'app usa dati dimostrativi.' }
   }
-  if (!(r.raggioKm > 0 && r.raggioKm <= 100)) throw new Error('Raggio non valido (1-100 km)')
+  if (!(r.raggioKm > 0 && r.raggioKm <= 100)) throw new Error('Raggio non valido (da 100 m a 100 km)')
   const codici = r.ateco?.length ? r.ateco : [undefined]
 
   if (r.azione === 'stima') {

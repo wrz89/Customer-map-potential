@@ -1,6 +1,6 @@
 import { CLASSI_ADDETTI } from '../lib/categories'
 import { GRUPPI_EURO, quoteEuro, quotaVecchie } from '../lib/eta'
-import { compatto, eur, n0, n1, pct } from '../lib/fmt'
+import { compatto, distKm, eur, n0, pct } from '../lib/fmt'
 import { etichettaAnello } from '../lib/geo'
 import type { ComuneZona, Zona } from '../lib/zone'
 import { useRef, useState } from 'react'
@@ -195,7 +195,7 @@ function Concorrenza({ zona, dealer, chiaveApp, acquisti, onAggiornaOsm, onNuovo
                     <td className="font-medium">{rete}</td>
                     <td style={{ color: 'var(--ink-2)' }}>{r.gruppo || '–'}</td>
                     <td className="r">{n0(r.n)}</td>
-                    <td className="r">{n1(r.vicino)} km</td>
+                    <td className="r">{distKm(r.vicino)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -221,7 +221,7 @@ export default function Territorio({ zona, evidenziato, onAggiornaOsm, dealer, c
   const maxAuto = Math.max(...zona.anelli.map((a) => a.autovetture))
   const col: Colonna<ComuneZona>[] = [
     { id: 'nome', label: 'Comune', valore: (z) => z.comune.n, render: (z) => <span className={`whitespace-nowrap ${z.comune.c === evidenziato ? 'font-bold' : 'font-medium'}`} style={z.comune.c === evidenziato ? { color: 'var(--brand-2)' } : undefined}>{z.comune.n} <span style={{ color: 'var(--muted)' }}>{z.comune.p}</span></span> },
-    { id: 'dist', label: 'Km', valore: (z) => z.distanzaKm, render: (z) => n1(z.distanzaKm), destra: true },
+    { id: 'dist', label: 'Distanza', valore: (z) => z.distanzaKm, render: (z) => distKm(z.distanzaKm), destra: true },
     { id: 'quota', label: '% nel raggio', valore: (z) => z.quota, render: (z) => pct(z.quota), destra: true },
     { id: 'pop', label: 'Abitanti', valore: (z) => z.totali.pop, render: (z) => n0(z.totali.pop), destra: true },
     { id: 'auto', label: 'Autovetture', valore: (z) => z.totali.autovetture, render: (z) => n0(z.totali.autovetture), destra: true },
@@ -280,7 +280,7 @@ export default function Territorio({ zona, evidenziato, onAggiornaOsm, dealer, c
                 </tr>
               ))}
               <tr style={{ fontWeight: 700 }}>
-                <td className="whitespace-nowrap">Totale {zona.raggioKm} km</td>
+                <td className="whitespace-nowrap">Totale {distKm(zona.raggioKm)}</td>
                 <td className="r">{n0(zona.totale.pop)}</td>
                 <td className="r">{n0(zona.totale.autovetture)}</td>
                 <td className="r">{n0(zona.totale.autocarri)}</td>
@@ -310,7 +310,7 @@ export default function Territorio({ zona, evidenziato, onAggiornaOsm, dealer, c
               </span>
             ))}
           </div>
-          {[...zona.anelli.map((a, i) => ({ nome: etichettaAnello(i, zona.limitiAnelli), euro: a.euro })), { nome: `Totale ${zona.raggioKm} km`, euro: zona.totale.euro }].map((r) => {
+          {[...zona.anelli.map((a, i) => ({ nome: etichettaAnello(i, zona.limitiAnelli), euro: a.euro })), { nome: `Totale ${distKm(zona.raggioKm)}`, euro: zona.totale.euro }].map((r) => {
             const q = quoteEuro(r.euro)
             return (
               <div key={r.nome} className="grid grid-cols-[90px_1fr] items-center gap-3 text-xs sm:grid-cols-[110px_1fr_220px]">

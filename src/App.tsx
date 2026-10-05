@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Aziende from './components/Aziende'
 import Confronto from './components/Confronto'
+import { CampoRaggio } from './components/CampoRaggio'
 import { DealerForm } from './components/DealerForm'
 import { Impostazioni } from './components/Impostazioni'
 import MapView, { type Centro, type Metrica } from './components/MapView'
@@ -416,8 +417,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-xs font-semibold" style={{ color: 'var(--ink-2)' }}>Raggio</span>
-                <input type="range" min={5} max={50} step={5} value={raggio} onChange={(e) => setRaggio(Number(e.target.value))} className="w-40 accent-[var(--brand-2)]" aria-label="Raggio in km" />
-                <span className="num whitespace-nowrap rounded-lg px-2.5 py-1 text-center text-sm font-bold" style={{ background: 'var(--surface-2)' }}>{raggio} km</span>
+                <CampoRaggio valoreKm={raggio} onChange={setRaggio} compatto />
               </div>
               <div className="ml-auto flex items-center gap-2">
                 {calcolo && <span className="text-xs" style={{ color: 'var(--muted)' }}>Calcolo…</span>}
@@ -437,6 +437,14 @@ export default function App() {
               <Kpi icona={<Wrench size={12} />} label="Officine e gommisti" valore={n0(t?.officine)} sotto={t && t.officine ? `${n0(t.autovetture / t.officine)} auto ciascuna` : undefined} />
               <Kpi icona={<Layers size={12} />} label="Aziende in elenco" valore={n0(aziende.length)} sotto={esplorato ? 'solo quelle già acquistate qui' : aziende.length ? 'acquistate o importate' : 'vai su Aziende'} />
             </div>
+
+            {raggio < 3 && (
+              <div className="px-5 pt-3">
+                <Avviso tipo="info">
+                  Raggio piccolo: abitanti, auto e addetti sono <b>stime</b>. Il dato ISTAT è per comune e qui si ripartisce per superficie, come se fosse uniforme: nei centri urbani il valore reale è più alto. Aziende e concorrenti sono invece punti reali.
+                </Avviso>
+              </div>
+            )}
 
             <div className="flex items-center gap-1 overflow-x-auto px-5 pt-4">
               {TABS.map((tb) => (

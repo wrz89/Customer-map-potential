@@ -7,7 +7,7 @@ import { Crosshair, Layers, Map as MapIcon, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Azienda } from '../lib/companies'
 import { quotaVecchie } from '../lib/eta'
-import { n0, n1 } from '../lib/fmt'
+import { distKm, n0 } from '../lib/fmt'
 import type { EsitoMatch, StatoMatch } from '../lib/match'
 import { DEMO } from '../lib/ambiente'
 import { geocodifica, type Dealer } from '../lib/store'
@@ -472,7 +472,7 @@ export default function MapView(props: Props) {
           .setHTML(
             `<div class="cmp-card"><div class="t">${esc(p.nome || `${tipo} senza nome`)}</div>
             <div class="s">${tipo} · ${rete}</div>
-            <table><tr><td>Distanza dal centro</td><td>${n1(Number(p.dist))} km</td></tr></table>
+            <table><tr><td>Distanza dal centro</td><td>${distKm(Number(p.dist))}</td></tr></table>
             <div class="m">La rete si ricava dal nome dell'attività.</div></div>`,
           )
           .addTo(map)
@@ -492,7 +492,7 @@ export default function MapView(props: Props) {
               <tr><td>Dipendenti</td><td>${a.dipendenti ? n0(a.dipendenti) : 'n.d.'}</td></tr>
               <tr><td>Fatturato</td><td>${a.fatturato ? `${n0(a.fatturato / 1000)} k€` : 'n.d.'}</td></tr>
               <tr><td>Intensità flotta</td><td>${esc(a.flotta || 'n.d.')}</td></tr>
-              <tr><td>Distanza</td><td>${n1(a.distanzaKm)} km</td></tr>
+              <tr><td>Distanza</td><td>${distKm(a.distanzaKm)}</td></tr>
               ${es ? `<tr><td>Stato</td><td><span class="dot" style="background:${STATO_COLORE[es.stato]}"></span>${esc(es.stato)}</td></tr>` : ''}
               ${es?.cliente ? `<tr><td>Cliente</td><td>${esc(es.cliente.ragioneSociale)}</td></tr>` : ''}
             </table>
@@ -507,7 +507,7 @@ export default function MapView(props: Props) {
           .setLngLat(e.lngLat)
           .setHTML(
             `<div class="cmp-card"><div class="t">${esc(p.nome)} <span class="m">${esc(p.prov)}</span></div>
-            <div class="s">${n1(Number(p.dist))} km dal centro · ${Math.round(Number(p.quota) * 100)}% nel raggio</div>
+            <div class="s">${distKm(Number(p.dist))} dal centro · ${Math.round(Number(p.quota) * 100)}% nel raggio</div>
             <table>
               <tr><td>Abitanti</td><td>${n0(Number(p.pop))}</td></tr>
               <tr><td>Autovetture</td><td>${n0(Number(p.auto))}</td></tr>

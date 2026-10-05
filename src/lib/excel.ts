@@ -7,6 +7,7 @@ import { CLASSI_ADDETTI, categoriaDaAteco } from './categories'
 import { GRUPPI_EURO, quoteEuro } from './eta'
 import type { Azienda } from './companies'
 import type { Meta } from './data'
+import { distKm } from './fmt'
 import { etichettaAnello } from './geo'
 import {
   CARATTERI_SPAZIO,
@@ -97,7 +98,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
   const co = wb.addWorksheet('Comuni', { views: [{ state: 'frozen', ySplit: 1, xSplit: 1 }] })
   const se = wb.addWorksheet('Settori ISTAT', { views: [{ state: 'frozen', ySplit: 1 }] })
   const cc = wb.addWorksheet('Concorrenza', { views: [{ state: 'frozen', ySplit: 1 }] })
-  titolo(lg, `Potenziale clienti · ${dealer.nome}`, `Raggio ${zona.raggioKm} km da ${dealer.indirizzo} · generato il ${oggi}`)
+  titolo(lg, `Potenziale clienti · ${dealer.nome}`, `Raggio ${distKm(zona.raggioKm)} da ${dealer.indirizzo} · generato il ${oggi}`)
   const istruzioni = [
     ['Come fare la cernita dei clienti'],
     ['1. Apri il foglio "Clienti dealer".'],
@@ -115,6 +116,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
     ['Aziende: indirizzo e coordinate sono quelli della sede legale. Un\'azienda con sede altrove e stabilimento in zona può non comparire.'],
     ['Dipendenti: dato dell\'ultimo bilancio disponibile; le ditte individuali spesso non lo hanno.'],
     ['Comuni e settori: dati ISTAT ripartiti in proporzione alla superficie del comune che cade nel raggio.'],
+    ...(zona.raggioKm < 3 ? [['ATTENZIONE: con raggi sotto i 3 km abitanti, auto e addetti sono stime. Il dato ISTAT è per comune e qui si suppone distribuito in modo uniforme: nei centri urbani il valore reale è più alto. Aziende e concorrenti sono invece punti reali.']] : []),
     ['Intensità flotta: stima qualitativa per settore (Alta, Media, Bassa), non un dato.'],
     [''],
     ['Fonti'],
@@ -216,7 +218,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
   cl.getColumn(6).font = { color: { argb: 'FF898781' } }
 
   /* ---------- Riepilogo ---------- */
-  titolo(rp, `Riepilogo zona · ${dealer.nome}`, `${dealer.indirizzo} · raggio ${zona.raggioKm} km · ${zona.comuni.length} comuni`)
+  titolo(rp, `Riepilogo zona · ${dealer.nome}`, `${dealer.indirizzo} · raggio ${distKm(zona.raggioKm)} · ${zona.comuni.length} comuni`)
   rp.getColumn(1).width = 30
   for (let c = 2; c <= 11; c++) rp.getColumn(c).width = 15
   let r = 4
@@ -283,7 +285,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
   zona.comuni.forEach((z, i) => {
     const t = z.totali
     co.getRow(i + 2).values = [
-      z.comune.n, z.comune.p, Math.round(z.distanzaKm * 10) / 10, z.quota, Math.round(t.pop), Math.round(t.autovetture),
+      z.comune.n, z.comune.p, Math.round(z.distanzaKm * 100) / 100, z.quota, Math.round(t.pop), Math.round(t.autovetture),
       Math.round(t.autocarri), Math.round(t.pesanti), Math.round(t.motocicli), Math.round(t.autobus), Math.round(t.unitaLocali), Math.round(t.addetti),
       Math.round(t.ulClassi[1]), Math.round(t.ulClassi[2]), Math.round(t.ulClassi[3]), Math.round(t.officine),
       z.comune.pop ?? undefined, z.comune.veh?.autovetture ?? undefined,
@@ -334,5 +336,5 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
 
 export function nomeFile(dealer: Dealer, raggioKm: number) {
   const slug = dealer.nome.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '')
-  return `Potenziale_${slug}_${raggioKm}km_${new Date().toISOString().slice(0, 10)}.xlsx`
+  return `Potenziale_${slug}_${raggioKm < 1 ? `${Math.round(raggioKm * 1000)}m` : `${String(raggioKm).replace('.', ',')}km`}_${new Date().toISOString().slice(0, 10)}.xlsx`
 }

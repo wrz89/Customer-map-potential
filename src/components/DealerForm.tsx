@@ -1,3 +1,4 @@
+import { CampoRaggio } from './CampoRaggio'
 import { MapPin, Search } from 'lucide-react'
 import { useState } from 'react'
 import { geocodifica, type Dealer, type RisultatoGeocodifica } from '../lib/store'
@@ -89,10 +90,10 @@ export function DealerForm({ iniziale, preset, onSalva, onElimina, onClose }: {
             <input className="input mt-1" type="number" step="0.0001" value={pos?.lon ?? ''} onChange={(e) => setPos({ lat: pos?.lat ?? 0, lon: Number(e.target.value) })} />
           </label>
         </div>
-        <label className="block text-xs font-semibold">
-          Raggio predefinito: {raggio} km
-          <input type="range" min={5} max={50} step={5} value={raggio} onChange={(e) => setRaggio(Number(e.target.value))} className="mt-1 w-full" />
-        </label>
+        <div className="block text-xs font-semibold">
+          Raggio predefinito
+          <div className="mt-1"><CampoRaggio valoreKm={raggio} onChange={setRaggio} /></div>
+        </div>
         <label className="block text-xs font-semibold">
           Note
           <input className="input mt-1" value={note} onChange={(e) => setNote(e.target.value)} />

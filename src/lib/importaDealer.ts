@@ -1,6 +1,7 @@
 // Import dell'elenco dealer da Excel/CSV.
 // Formato tipico della rete: Ragione Sociale | Indirizzo | Cap | Città (Provincia, Lat, Lon, Raggio facoltative).
 import { numero, type Righe } from './leggiFile'
+import { leggiRaggio } from './raggio'
 
 export type Precisione = 'indirizzo' | 'cap' | 'comune'
 
@@ -37,6 +38,12 @@ export function normalizzaCap(s: string): string {
   return c && c.length <= 5 ? c.padStart(5, '0') : ''
 }
 
+/** Raggio dal file: la colonna può essere in km (predefinito) o in metri se il titolo dice "metri" o "(m)". */
+function raggioDaCella(valore: string, titolo: string): number | null {
+  const n = leggiRaggio(/km/i.test(valore) || /m(etri)?\b/i.test(valore) ? valore : `${valore} ${/\(m\)|metri|\bm$/i.test(titolo.trim()) ? 'm' : 'km'}`)
+  return n
+}
+
 export function colonneDealer(intestazioni: string[]) {
   const col = {
     nome: trova(intestazioni, /(ragione\s*sociale|denominazione|dealer|^nome|punto\s*vendita|centro|rag\.?\s*soc)/i),
@@ -68,7 +75,7 @@ export function leggiRigheDealer(intestazioni: string[], righe: Righe): RigaDeal
       provincia: v(r, col.provincia).toUpperCase(),
       lat: col.lat ? numero(v(r, col.lat)) : null,
       lon: col.lon ? numero(v(r, col.lon)) : null,
-      raggioKm: col.raggio ? numero(v(r, col.raggio)) : null,
+      raggioKm: col.raggio ? raggioDaCella(v(r, col.raggio), col.raggio) : null,
     }))
     .filter((r) => r.nome)
 }

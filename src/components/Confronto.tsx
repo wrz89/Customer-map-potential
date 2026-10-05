@@ -1,7 +1,7 @@
 import { CheckCircle2, CircleHelp, FileUp, Sparkles, Trash2, UserCheck } from 'lucide-react'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Azienda } from '../lib/companies'
-import { n0, n1 } from '../lib/fmt'
+import { distKm, n0 } from '../lib/fmt'
 import { indovinaColonne, leggiTabella } from '../lib/leggiFile'
 import { STATI, type Cliente, type EsitoMatch, type StatoMatch } from '../lib/match'
 import type { ListaClienti } from '../lib/store'
@@ -84,7 +84,7 @@ export default function Confronto({ aziende, lista, esiti, onCarica, onRimuovi }
     { id: 'cat', label: 'Categoria', valore: (a) => a.categoria },
     { id: 'flotta', label: 'Flotta', valore: (a) => a.flotta, render: (a) => <FlottaBadge f={a.flotta} /> },
     { id: 'dip', label: 'Dipendenti', valore: (a) => a.dipendenti, render: (a) => n0(a.dipendenti), destra: true },
-    { id: 'dist', label: 'Km', valore: (a) => a.distanzaKm, render: (a) => n1(a.distanzaKm), destra: true },
+    { id: 'dist', label: 'Distanza', valore: (a) => a.distanzaKm, render: (a) => distKm(a.distanzaKm), destra: true },
   ]
 
   return (

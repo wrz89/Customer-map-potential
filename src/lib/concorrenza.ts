@@ -61,7 +61,7 @@ export function convertiElementi(el: ElementoOsm[], lat: number, lon: number, ra
     const d = distanzaKm(lat, lon, la, lo)
     if (d > raggioKm) continue
     const tags = e.tags ?? {}
-    out.push({ lat: la, lon: lo, ...classificaOfficina(tags), nome: tags.name ?? tags.brand ?? '', distanzaKm: Math.round(d * 10) / 10, fonte: 'osm' })
+    out.push({ lat: la, lon: lo, ...classificaOfficina(tags), nome: tags.name ?? tags.brand ?? '', distanzaKm: Math.round(d * 100) / 100, fonte: 'osm' })
   }
   return out.sort((a, b) => a.distanzaKm - b.distanzaKm)
 }
@@ -117,7 +117,7 @@ export function daRegistro(aziende: Azienda[], lat: number, lon: number, raggioK
     const d = distanzaKm(lat, lon, a.lat, a.lon)
     if (d > raggioKm) continue
     const c = classificaOfficina({ name: a.ragioneSociale })
-    out.push({ lat: a.lat, lon: a.lon, gommista: true, rete: c.rete, gruppo: c.gruppo, nome: a.ragioneSociale, distanzaKm: Math.round(d * 10) / 10, fonte: 'registro', indirizzo: [a.indirizzo, a.comune].filter(Boolean).join(', '), piva: a.piva, centroComune: a.fonte === 'import' })
+    out.push({ lat: a.lat, lon: a.lon, gommista: true, rete: c.rete, gruppo: c.gruppo, nome: a.ragioneSociale, distanzaKm: Math.round(d * 100) / 100, fonte: 'registro', indirizzo: [a.indirizzo, a.comune].filter(Boolean).join(', '), piva: a.piva, centroComune: a.fonte === 'import' })
   }
   return out.sort((x, y) => x.distanzaKm - y.distanzaKm)
 }

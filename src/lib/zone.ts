@@ -156,7 +156,7 @@ export async function calcolaZona(lat: number, lon: number, raggioKm: number): P
   for (const lista of offs)
     for (const [la, lo, tipo, rete, gruppo, nome] of lista) {
       const d = distanzaKm(lat, lon, la, lo)
-      if (d <= raggioKm) concorrenti.push({ lat: la, lon: lo, gommista: tipo === 'g', rete, gruppo, nome, distanzaKm: Math.round(d * 10) / 10 })
+      if (d <= raggioKm) concorrenti.push({ lat: la, lon: lo, gommista: tipo === 'g', rete, gruppo, nome, distanzaKm: Math.round(d * 100) / 100 })
     }
   concorrenti.sort((a, b) => a.distanzaKm - b.distanzaKm)
   const geoByCode = new Map<string, Feature<Polygon | MultiPolygon, { c: string }>>()
@@ -184,7 +184,8 @@ export async function calcolaZona(lat: number, lon: number, raggioKm: number): P
     })
     const quoteAnelli = cumul.map((v, i) => Math.max(0, (v - (i ? cumul[i - 1] : 0)) / areaTot))
     const quota = Math.min(1, cumul[cumul.length - 1] / areaTot)
-    if (quota < 0.005) continue
+    // con raggi piccoli (500 m) il comune del dealer è molto meno dello 0,5% della sua superficie: conta quanto pesa nel cerchio
+    if (quota < 0.005 && cumul[cumul.length - 1] < 0.01 * area(esterno)) continue
     const ul = ulByCode.get(c.c)
     comuni.push({
       comune: c,

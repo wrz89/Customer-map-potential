@@ -2,7 +2,7 @@ import { Coins, Database, FileUp, FlaskConical, Search, Trash2 } from 'lucide-re
 import { useMemo, useRef, useState } from 'react'
 import { CATEGORIE } from '../lib/categories'
 import { acquistaOpenapi, generaDemo, importaElenco, stimaOpenapi, type Azienda, type StimaOpenapi } from '../lib/companies'
-import { eur, n0, n1 } from '../lib/fmt'
+import { distKm, eur, n0 } from '../lib/fmt'
 import type { Acquisto, Dealer } from '../lib/store'
 import type { Zona } from '../lib/zone'
 import { Avviso, BottoneConferma, FlottaBadge, Sezione, Tabella, type Colonna } from './ui'
@@ -124,7 +124,7 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
     { id: 'dip', label: 'Dipendenti', valore: (a) => a.dipendenti, render: (a) => n0(a.dipendenti), destra: true },
     { id: 'fatt', label: 'Fatturato', valore: (a) => a.fatturato, render: (a) => (a.fatturato ? `${n0(a.fatturato / 1000)} k€` : '–'), destra: true },
     { id: 'comune', label: 'Comune', valore: (a) => a.comune, render: (a) => <div><div>{a.comune} {a.provincia && <span style={{ color: 'var(--muted)' }}>{a.provincia}</span>}</div><div className="text-[11px]" style={{ color: 'var(--muted)' }}>{a.indirizzo}</div></div> },
-    { id: 'dist', label: 'Km', valore: (a) => a.distanzaKm, render: (a) => n1(a.distanzaKm), destra: true },
+    { id: 'dist', label: 'Distanza', valore: (a) => a.distanzaKm, render: (a) => distKm(a.distanzaKm), destra: true },
   ]
 
   return (
@@ -135,7 +135,7 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
             <Coins size={18} style={{ color: 'var(--accent)' }} /> Acquista i nominativi della zona
           </div>
           <p className="mt-1 text-xs" style={{ color: 'var(--ink-2)' }}>
-            Registro Imprese tramite Openapi: aziende attive con sede legale entro {zona.raggioKm} km, con ATECO, dipendenti, fatturato e PEC. Prima si stima il costo, poi si conferma.
+            Registro Imprese tramite Openapi: aziende attive con sede legale entro {distKm(zona.raggioKm)}, con ATECO, dipendenti, fatturato e PEC. Prima si stima il costo, poi si conferma.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-semibold">
@@ -242,7 +242,7 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
                   <tr key={a.id}>
                     <td>{new Date(a.data).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })}</td>
                     <td><span className="inline-flex items-center gap-1"><Database size={13} /> {{ openapi: 'Openapi', import: 'File importato', demo: 'Dimostrativo' }[a.fonte]}</span></td>
-                    <td className="r">{a.raggioKm} km</td>
+                    <td className="r">{distKm(a.raggioKm)}</td>
                     <td className="text-xs">{a.filtri.minDipendenti ? `${a.filtri.minDipendenti}+ dipendenti` : 'tutti'}{a.filtri.ateco?.length ? ` · ${a.filtri.ateco.length} ATECO` : ''}</td>
                     <td className="r">{n0(a.conteggio)}</td>
                     <td className="r">{a.prezzo === null ? '–' : eur(a.prezzo)}</td>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { anelli } from '../src/lib/geo'
+import { anelli, etichettaAnello } from '../src/lib/geo'
+import { leggiRaggio } from '../src/lib/raggio'
 import { calcolaZona } from '../src/lib/zone'
 
 describe('anelli', () => {
@@ -7,6 +8,58 @@ describe('anelli', () => {
     expect(anelli(15)).toEqual([5, 10, 15])
     expect(anelli(30)).toEqual([10, 20, 30])
     expect(anelli(25)).toEqual([10, 20, 25])
+  })
+})
+
+describe('anelli e fasce per raggi piccoli', () => {
+  it('fasce da 250 m sotto il chilometro, da 1 km fino a 5', () => {
+    expect(anelli(0.5)).toEqual([0.25, 0.5])
+    expect(anelli(0.1)).toEqual([0.1])
+    expect(anelli(1)).toEqual([0.25, 0.5, 0.75, 1])
+    expect(anelli(3.5)).toEqual([1, 2, 3, 3.5])
+    expect(anelli(5)).toEqual([5])
+    expect(anelli(10)).toEqual([5, 10])
+  })
+  it('etichette in metri e chilometri', () => {
+    expect(etichettaAnello(0, [0.25, 0.5])).toBe('0-250 m')
+    expect(etichettaAnello(1, [0.25, 0.5])).toBe('250-500 m')
+    expect(etichettaAnello(1, [0.5, 1])).toBe('500 m-1 km')
+    expect(etichettaAnello(1, [1, 2, 3])).toBe('1-2 km')
+    expect(etichettaAnello(2, [5, 10, 15])).toBe('10-15 km')
+  })
+})
+
+describe('leggiRaggio', () => {
+  it('capisce metri, km e formati italiani', () => {
+    expect(leggiRaggio('500')).toBe(0.5)
+    expect(leggiRaggio('500 m')).toBe(0.5)
+    expect(leggiRaggio('1500')).toBe(1.5)
+    expect(leggiRaggio('1.500')).toBe(1.5)
+    expect(leggiRaggio('2 km')).toBe(2)
+    expect(leggiRaggio('0,5 km')).toBe(0.5)
+    expect(leggiRaggio('15km')).toBe(15)
+  })
+  it('limita tra 100 m e 100 km e rifiuta il resto', () => {
+    expect(leggiRaggio('20')).toBe(0.1)
+    expect(leggiRaggio('500000')).toBe(100)
+    expect(leggiRaggio('')).toBeNull()
+    expect(leggiRaggio('abc')).toBeNull()
+    expect(leggiRaggio('0')).toBeNull()
+  })
+})
+
+describe('calcolaZona a 500 m', () => {
+  it('non perde il comune del dealer e le quote sono piccole ma coerenti', async () => {
+    const z = await calcolaZona(45.1847, 9.1582, 0.5)
+    const pavia = z.comuni.find((c) => c.comune.c === '018110')
+    expect(pavia).toBeDefined()
+    expect(pavia!.quota).toBeGreaterThan(0)
+    expect(pavia!.quota).toBeLessThan(0.1)
+    expect(z.limitiAnelli).toEqual([0.25, 0.5])
+    expect(z.geometrie.length).toBeGreaterThan(0)
+    const somma = z.anelli.reduce((s, a) => s + a.autovetture, 0)
+    expect(Math.abs(somma - z.totale.autovetture)).toBeLessThan(1)
+    expect(z.totale.pop).toBeLessThan(10_000)
   })
 })
 

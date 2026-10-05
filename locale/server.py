@@ -110,7 +110,7 @@ def gestisci(r: dict, imp: dict) -> dict:
     if not imp.get("OPENAPI_TOKEN"):
         return {"demo": True, "messaggio": "Token Openapi non configurato in impostazioni.txt: l'app usa dati dimostrativi."}
     if not (0 < float(r.get("raggioKm", 0)) <= 100):
-        raise ValueError("Raggio non valido (1-100 km)")
+        raise ValueError("Raggio non valido (da 100 m a 100 km)")
     codici = r.get("ateco") or [None]
     sandbox = imp.get("OPENAPI_SANDBOX") == "1"
     if r.get("azione") == "stima":
