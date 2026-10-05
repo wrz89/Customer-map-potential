@@ -94,10 +94,8 @@
     },
     "publish": [
       {
-        "provider": "github",
-        "owner": "wrz89",
-        "repo": "customer-map-potential",
-        "releaseType": "release"
+        "provider": "generic",
+        "url": "https://github.com/wrz89/Customer-map-potential/releases/latest/download"
       }
     ]
   },

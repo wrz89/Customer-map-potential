@@ -9,7 +9,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 
-const REPO = 'wrz89/customer-map-potential'
+const REPO = 'wrz89/Customer-map-potential'
 const PAGINA = `https://github.com/${REPO}/releases/latest`
 const ASSET_PORTATILE = 'Customer-Map-Potential-Portable.exe'
 const OGNI = 6 * 60 * 60 * 1000
@@ -138,7 +138,7 @@ function messaggioErrore(e) {
   const m = String(e?.message || e)
   if (/ENOTFOUND|ETIMEDOUT|ECONNRESET|ERR_INTERNET|net::/i.test(m)) return 'Nessuna connessione a GitHub'
   if (/EPERM|EACCES/i.test(m)) return 'La cartella del programma non è scrivibile: scarica la nuova versione a mano'
-  return m.split('\n')[0].slice(0, 200)
+  return m.replace(/\s+/g, ' ').slice(0, 300)
 }
 
 async function chiediRiavvio(versione) {
@@ -223,9 +223,14 @@ function avvia(ipcMain) {
 /** Verifica, scarica e installa senza domande, poi scrive l'esito ed esce. */
 async function provaAggiornamento() {
   const fine = Date.now() + 10 * 60 * 1000
-  await verifica(false)
-  while (!['pronto', 'aggiornato', 'errore'].includes(stato.fase) && Date.now() < fine) {
-    await new Promise((ok) => setTimeout(ok, 1000))
+  // la release appena pubblicata può metterci qualche istante a comparire
+  for (let tentativo = 0; tentativo < 5; tentativo++) {
+    if (tentativo) await new Promise((ok) => setTimeout(ok, 20000))
+    await verifica(false)
+    while (!['pronto', 'aggiornato', 'errore'].includes(stato.fase) && Date.now() < fine) {
+      await new Promise((ok) => setTimeout(ok, 1000))
+    }
+    if (stato.fase !== 'errore') break
   }
   fs.writeFileSync(PROVA, JSON.stringify({ ...stato, portatile: portatile() }, null, 1), 'utf-8')
   if (stato.fase !== 'pronto') return app.exit(0)

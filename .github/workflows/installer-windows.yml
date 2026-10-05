@@ -123,6 +123,13 @@ jobs:
             Write-Host "Versione trovata: $((Get-Item $exe).VersionInfo.ProductVersion)"
             return $false
           }
+          # diagnosi: gli indirizzi letti dalle versioni installate
+          foreach ($u in @(
+            'https://github.com/${{ github.repository }}/releases.atom',
+            'https://github.com/wrz89/customer-map-potential/releases.atom',
+            'https://github.com/${{ github.repository }}/releases/latest/download/latest.yml')) {
+            try { $r = Invoke-WebRequest $u -UseBasicParsing; Write-Host "$($r.StatusCode) $u" } catch { Write-Host "ERRORE $u : $($_.Exception.Message)" }
+          }
           $cartella = Split-Path $env:EXE
           Start-Process -FilePath (Join-Path $cartella 'Uninstall Customer Map Potential.exe') -ArgumentList '/S' -Wait
           Start-Sleep 5
