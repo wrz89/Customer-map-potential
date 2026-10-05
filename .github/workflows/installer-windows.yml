@@ -66,6 +66,8 @@ jobs:
       - name: Prepara i file della release
         if: github.ref == 'refs/heads/main'
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           New-Item -ItemType Directory -Force pubblica, zip, precedente | Out-Null
           Copy-Item release\Customer-Map-Potential-Portable.exe zip\
@@ -73,14 +75,16 @@ jobs:
           Compress-Archive -Path zip\* -DestinationPath pubblica\Customer-Map-Potential-Windows.zip
           Copy-Item release\Customer-Map-Potential-Setup.exe, release\Customer-Map-Potential-Setup.exe.blockmap, release\latest.yml, release\Customer-Map-Potential-Portable.exe pubblica\
           Get-ChildItem pubblica
-          # versione precedente, per provare l'aggiornamento vero dopo la pubblicazione
-          $u = 'https://github.com/${{ github.repository }}/releases/latest/download'
-          try {
-            Invoke-WebRequest "$u/latest.yml" -OutFile precedente\latest.yml
-            Invoke-WebRequest "$u/Customer-Map-Potential-Setup.exe" -OutFile precedente\Setup.exe
-            Invoke-WebRequest "$u/Customer-Map-Potential-Portable.exe" -OutFile precedente\Customer-Map-Potential-Portable.exe
+          # versione precedente (l'attuale "latest", prima di pubblicare questa), per provare l'aggiornamento vero
+          $prec = gh release view --repo ${{ github.repository }} --json tagName -q .tagName
+          Write-Host "Versione precedente: $prec"
+          gh release download $prec --repo ${{ github.repository }} -D precedente -p latest.yml -p Customer-Map-Potential-Setup.exe -p Customer-Map-Potential-Portable.exe
+          $global:LASTEXITCODE = 0  # una versione vecchia senza questi file non deve bloccare la pubblicazione
+          if ((Test-Path precedente\latest.yml) -and (Test-Path precedente\Customer-Map-Potential-Portable.exe)) {
             "PROVA_AGGIORNAMENTO=1" | Out-File $env:GITHUB_ENV -Append
-          } catch { Write-Host "Nessuna versione precedente con aggiornamento automatico: prova saltata" }
+          } else {
+            Write-Host "La versione $prec non ha l'aggiornamento automatico: prova saltata"
+          }
       - name: Pubblica la release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
@@ -122,7 +126,7 @@ jobs:
           $cartella = Split-Path $env:EXE
           Start-Process -FilePath (Join-Path $cartella 'Uninstall Customer Map Potential.exe') -ArgumentList '/S' -Wait
           Start-Sleep 5
-          Start-Process -FilePath precedente\Setup.exe -ArgumentList '/S' -Wait
+          Start-Process -FilePath precedente\Customer-Map-Potential-Setup.exe -ArgumentList '/S' -Wait
           Write-Host "Installata la precedente: $((Get-Item $env:EXE).VersionInfo.ProductVersion)"
           $esito = "$env:RUNNER_TEMP\agg-installato.json"
           Start-Process -FilePath $env:EXE -ArgumentList "--prova-aggiornamento=$esito" -Wait

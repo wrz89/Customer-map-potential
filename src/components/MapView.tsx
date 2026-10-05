@@ -9,7 +9,7 @@ import type { Azienda } from '../lib/companies'
 import { quotaVecchie } from '../lib/eta'
 import { n0, n1 } from '../lib/fmt'
 import type { EsitoMatch, StatoMatch } from '../lib/match'
-import { DEMO, desktop } from '../lib/ambiente'
+import { DEMO } from '../lib/ambiente'
 import { geocodifica, type Dealer } from '../lib/store'
 import type { Zona } from '../lib/zone'
 
@@ -68,27 +68,15 @@ const stileVuoto = (tema: 'light' | 'dark'): maplibregl.StyleSpecification => ({
   layers: [{ id: 'sfondo', type: 'background', paint: { 'background-color': tema === 'dark' ? '#0f1520' : '#eef0f3' } }],
 })
 
-/** Mappe di base: OpenFreeMap gratis; Google solo nell'app per PC, con la chiave in Impostazioni. */
-export type Base = 'stradale' | 'chiara' | 'google' | 'satellite'
-const BASI: { id: Base; nome: string; google?: boolean }[] = [
+/** Mappe di base OpenFreeMap: gratis anche per uso commerciale, senza chiave e senza limiti. */
+export type Base = 'stradale' | 'chiara'
+const BASI: { id: Base; nome: string }[] = [
   { id: 'stradale', nome: 'Stradale' },
   { id: 'chiara', nome: 'Chiara, per leggere i dati' },
-  { id: 'google', nome: 'Google Maps', google: true },
-  { id: 'satellite', nome: 'Google satellite', google: true },
 ]
 const OFM = 'https://tiles.openfreemap.org'
-const stileGoogle = (tipo: 'roadmap' | 'satellite'): maplibregl.StyleSpecification => ({
-  version: 8,
-  glyphs: `${OFM}/fonts/{fontstack}/{range}.pbf`,
-  sources: {
-    google: { type: 'raster', tiles: [`${location.origin}/api/google/tile/{z}/{x}/{y}?tipo=${tipo}`], tileSize: 256, maxzoom: 20 },
-  },
-  layers: [{ id: 'google', type: 'raster', source: 'google' }],
-})
 const stileBase = (tema: 'light' | 'dark', base: Base): string | maplibregl.StyleSpecification => {
   if (DEMO) return stileVuoto(tema)
-  if (base === 'google') return stileGoogle('roadmap')
-  if (base === 'satellite') return stileGoogle('satellite')
   if (tema === 'dark') return `${OFM}/styles/dark`
   return `${OFM}/styles/${base === 'stradale' ? 'liberty' : 'positron'}`
 }
@@ -245,13 +233,8 @@ export default function MapView(props: Props) {
   const [pannello, setPannello] = useState(true)
   const [erroreMappa, setErroreMappa] = useState(false)
   const [base, setBase] = useState<Base>(leggiBase)
-  const [haGoogle, setHaGoogle] = useState(false)
-  const [copyGoogle, setCopyGoogle] = useState('')
-  // senza chiave Google si resta sulla mappa stradale
-  const baseEff: Base = BASI.find((b) => b.id === base)?.google && !haGoogle ? 'stradale' : base
-  const baseRef = useRef(baseEff)
-  baseRef.current = baseEff
-  const aggiornaGoogle = () => desktop?.leggiImpostazioni().then((s) => setHaGoogle(!!s.haGoogle))
+  const baseRef = useRef(base)
+  baseRef.current = base
 
   // i gestori degli eventi della mappa leggono sempre i valori aggiornati
   const live = useRef(props)
@@ -563,38 +546,11 @@ export default function MapView(props: Props) {
   /* ---------- sincronizzazione ---------- */
 
   useEffect(() => {
-    aggiornaGoogle()
-  }, [])
-
-  useEffect(() => {
     const map = mapRef.current
-    if (map && pronta) map.setStyle(stileBase(tema, baseEff))
+    if (map && pronta) map.setStyle(stileBase(tema, base))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tema, baseEff])
+  }, [tema, base])
 
-  // Google chiede di mostrare la sua attribuzione, che cambia con la zona inquadrata
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || (baseEff !== 'google' && baseEff !== 'satellite')) return setCopyGoogle('')
-    const tipo = baseEff === 'google' ? 'roadmap' : 'satellite'
-    let ultimo = 0
-    const leggi = async () => {
-      const n = ++ultimo
-      const b = map.getBounds()
-      const q = new URLSearchParams({ tipo, zoom: String(Math.round(map.getZoom())), north: String(b.getNorth()), south: String(b.getSouth()), east: String(b.getEast()), west: String(b.getWest()) })
-      try {
-        const j = await (await fetch(`/api/google/viewport?${q}`)).json()
-        if (n === ultimo) setCopyGoogle(j.errore ? `errore: ${j.errore}` : j.copyright || '')
-      } catch {
-        /* resta l'ultima attribuzione */
-      }
-    }
-    leggi()
-    map.on('moveend', leggi)
-    return () => {
-      map.off('moveend', leggi)
-    }
-  }, [baseEff, pronta])
 
   useEffect(() => {
     if (visibile) mapRef.current?.resize()
@@ -691,9 +647,7 @@ export default function MapView(props: Props) {
             <Layers size={14} />
             <select
               className="bg-transparent font-semibold outline-none"
-              value={baseEff}
-              onMouseDown={aggiornaGoogle}
-              onFocus={aggiornaGoogle}
+              value={base}
               onChange={(e) => {
                 const b = e.target.value as Base
                 setBase(b)
@@ -705,10 +659,8 @@ export default function MapView(props: Props) {
               }}
               aria-label="Mappa di base"
             >
-              {BASI.filter((b) => !b.google || desktop).map((b) => (
-                <option key={b.id} value={b.id} disabled={b.google && !haGoogle}>
-                  {b.nome}{b.google && !haGoogle ? ': serve la chiave in Impostazioni' : ''}
-                </option>
+              {BASI.map((b) => (
+                <option key={b.id} value={b.id}>{b.nome}</option>
               ))}
             </select>
           </div>
@@ -757,12 +709,6 @@ export default function MapView(props: Props) {
           <Crosshair size={14} /> {esplora ? 'Clicca un punto della mappa' : 'Esplora un punto'}
         </button>
       </div>
-
-      {copyGoogle && (
-        <div className="absolute bottom-1 left-32 rounded px-1.5 py-0.5 text-[10px]" style={{ background: 'rgb(255 255 255 / .8)', color: '#3c4043' }}>
-          <b>Google Maps</b> · {copyGoogle}
-        </div>
-      )}
 
       {/* pannello livelli e legenda */}
       <div className="absolute bottom-8 right-3 flex max-h-[calc(100%-110px)] flex-col items-end gap-2">

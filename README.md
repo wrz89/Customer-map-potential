@@ -53,15 +53,7 @@ Al primo avvio Windows può mostrare "Windows ha protetto il PC": il programma n
 - I dati di comuni, veicoli e settori sono dentro il programma. Dealer, acquisti e liste clienti restano sul PC, nella cartella che si apre da **File → Apri la cartella dei dati**.
 - Il token Openapi si inserisce in **Impostazioni**. Viene cifrato con la protezione di Windows e la pagina non lo vede mai.
 - Internet serve solo per la mappa, la ricerca indirizzi, OpenStreetMap e Openapi.
-- **Mappa di base**, menu in alto sulla mappa: *Stradale* (stile simile a Google, gratis, OpenFreeMap), *Chiara* (per leggere i colori dei comuni), e con una chiave Google *Google Maps* e *Google satellite*.
-
-### Mappa Google (facoltativa)
-
-1. Su console.cloud.google.com crea un progetto e collega un account di fatturazione (serve una carta).
-2. Attiva solo **Map Tiles API** e crea una chiave API. In "Restrizioni API" limitala a Map Tiles API.
-3. Nell'app: **Impostazioni → Mappa Google**, incolla la chiave (`AIza…`). Resta sul PC, cifrata; le tessere passano dal programma e la pagina non vede la chiave.
-
-Costi: Map Tiles API ha 100.000 tessere 2D gratis al mese, poi si paga a consumo; una schermata di mappa usa circa 20-40 tessere, quindi l'uso interno di pochi utenti resta di norma nella quota gratuita. Limite di 15.000 tessere al giorno per progetto. Google chiede di mostrare la sua attribuzione, che l'app aggiunge in basso. I dati Google Places restano esclusi, come spiegato sotto.
+- **Mappa di base**, menu in alto sulla mappa: *Stradale*, in stile simile a Google, e *Chiara*, per leggere i colori dei comuni. Sono di OpenFreeMap, con dati OpenStreetMap: gratis anche per uso aziendale, senza chiave e senza limiti di visualizzazioni.
 - L'app non apre porte di rete: dagli altri PC non si raggiunge.
 
 Per ricreare i file: `npm run installer` su Windows, oppure dalla scheda **Actions** di GitHub, flusso "Installer Windows", che crea installatore e versione portatile, li installa, avvia l'app e ne controlla il funzionamento.
