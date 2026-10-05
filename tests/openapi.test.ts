@@ -61,3 +61,25 @@ describe('messaggi di errore Openapi', async () => {
     expect(spiegaErrore(418, 'x', {})).toBe('Openapi 418: x')
   })
 })
+
+describe('rete irraggiungibile', async () => {
+  const { spiegaRete, provaToken } = await import('../server/openapi')
+  it('spiega DNS, certificato e proxy invece di "fetch failed"', () => {
+    expect(spiegaRete(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } }), { OPENAPI_SANDBOX: '1' })).toMatch(/DNS/)
+    expect(spiegaRete(Object.assign(new TypeError('fetch failed'), { cause: { code: 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' } }), {})).toMatch(/certificato/)
+    expect(spiegaRete(new TypeError('fetch failed'), { OPENAPI_SANDBOX: '1' })).toMatch(/proxy o firewall.*test\.company|test\.company.*proxy o firewall/s)
+  })
+  it('usa il fetch passato, così nell’app per PC valgono proxy e certificati di Windows', async () => {
+    let chiamato = ''
+    const http = (async (url: string) => {
+      chiamato = String(url)
+      return new Response(JSON.stringify({ data: { count: 7 } }), { status: 200 })
+    }) as unknown as typeof fetch
+    const r = await provaToken({ OPENAPI_TOKEN: 't', OPENAPI_SANDBOX: '1', http })
+    expect(r.ok).toBe(true)
+    expect(chiamato).toContain('test.company.openapi.com/IT-search')
+    const ko = await provaToken({ OPENAPI_TOKEN: 't', http: (async () => { throw new TypeError('fetch failed') }) as unknown as typeof fetch })
+    expect(ko.ok).toBe(false)
+    expect(ko.messaggio).toMatch(/Non riesco a raggiungere Openapi/)
+  })
+})

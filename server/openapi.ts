@@ -14,6 +14,8 @@ export interface RichiestaAziende {
 }
 
 export interface Ambiente {
+  /** nell'app per PC è net.fetch di Electron: usa proxy e certificati di Windows, come il browser */
+  http?: typeof fetch
   OPENAPI_TOKEN?: string
   OPENAPI_SANDBOX?: string
   APP_PASSWORD?: string
@@ -41,6 +43,18 @@ function parametri(r: RichiestaAziende, ateco: string | undefined) {
 
 const NOME_HOST = (env: Ambiente) => (env.OPENAPI_SANDBOX === '1' ? 'test.company.openapi.com' : 'company.openapi.com')
 
+/** Rete irraggiungibile: cosa è successo davvero (DNS, certificato, connessione) e cosa controllare. */
+export function spiegaRete(e: unknown, env: Ambiente): string {
+  const err = e as { message?: string; cause?: { code?: string; message?: string } }
+  const motivo = [err?.cause?.code, err?.cause?.message ?? err?.message].filter(Boolean).join(' · ')
+  const codice = `${err?.cause?.code ?? ''} ${err?.message ?? ''}`
+  let consiglio = 'Controlla la connessione a internet.'
+  if (/ENOTFOUND|EAI_AGAIN|ERR_NAME_NOT_RESOLVED/.test(codice)) consiglio = 'Il nome del sito non si risolve: controlla internet o il DNS aziendale.'
+  else if (/CERT|SSL|TLS|SIGNATURE|SELF_SIGNED/i.test(codice)) consiglio = 'Problema di certificato: tipico di un proxy aziendale che ispeziona il traffico. Chiedi all\'IT di sbloccare il sito.'
+  else if (/ECONNREFUSED|ECONNRESET|ETIMEDOUT|ERR_CONNECTION|ERR_PROXY|ERR_TUNNEL|fetch failed/i.test(codice)) consiglio = 'Probabile proxy o firewall aziendale: chiedi all\'IT di consentire il sito.'
+  return `Non riesco a raggiungere Openapi (${NOME_HOST(env)}). ${consiglio}${motivo ? ` Dettaglio: ${motivo}` : ''}`
+}
+
 /** Messaggio in italiano per gli errori di Openapi più comuni: cosa è successo e cosa fare. */
 export function spiegaErrore(status: number, dettaglio: string, env: Ambiente): string {
   const prova = env.OPENAPI_SANDBOX === '1'
@@ -57,9 +71,14 @@ export function spiegaErrore(status: number, dettaglio: string, env: Ambiente): 
 }
 
 async function chiama(env: Ambiente, p: URLSearchParams) {
-  const res = await fetch(`${host(env)}/IT-search?${p}`, {
-    headers: { Authorization: `Bearer ${env.OPENAPI_TOKEN}`, Accept: 'application/json' },
-  })
+  let res: Response
+  try {
+    res = await (env.http ?? fetch)(`${host(env)}/IT-search?${p}`, {
+      headers: { Authorization: `Bearer ${env.OPENAPI_TOKEN}`, Accept: 'application/json' },
+    })
+  } catch (e) {
+    throw new Error(spiegaRete(e, env))
+  }
   const text = await res.text()
   let body: unknown
   try {

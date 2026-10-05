@@ -77,7 +77,7 @@ async function gestisciRichiesta(request) {
     if (request.method !== 'POST') return Response.json({ errore: 'Usa POST' }, { status: 405 })
     try {
       const corpo = await request.json()
-      const env = { OPENAPI_TOKEN: token(), OPENAPI_SANDBOX: statoImpostazioni().sandbox ? '1' : '0' }
+      const env = { OPENAPI_TOKEN: token(), OPENAPI_SANDBOX: statoImpostazioni().sandbox ? '1' : '0', http: net.fetch }
       const r = await gestisci(corpo, env)
       if (r.demo) r.messaggio = 'Token Openapi non inserito: apri Impostazioni e incollalo. Intanto l\'app usa dati dimostrativi.'
       return Response.json(r)
@@ -224,7 +224,7 @@ if (!app.requestSingleInstanceLock()) {
     protocol.handle(SCHEMA, gestisciRichiesta)
     ipcMain.handle('impostazioni:leggi', () => statoImpostazioni())
     ipcMain.handle('impostazioni:salva', (_e, v) => salvaImpostazioni(v || {}))
-    ipcMain.handle('impostazioni:prova', () => provaToken({ OPENAPI_TOKEN: token(), OPENAPI_SANDBOX: statoImpostazioni().sandbox ? '1' : '0' }))
+    ipcMain.handle('impostazioni:prova', () => provaToken({ OPENAPI_TOKEN: token(), OPENAPI_SANDBOX: statoImpostazioni().sandbox ? '1' : '0', http: net.fetch }))
     aggiornamenti.avvia(ipcMain)
     menu()
     finestra = creaFinestra()
