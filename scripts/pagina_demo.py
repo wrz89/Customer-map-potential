@@ -26,3 +26,11 @@ pagina = f"""<title>Customer Map Potential</title>
 """
 (DIST / "pagina.html").write_text(pagina, encoding="utf-8")
 print(f"Scritta {DIST / 'pagina.html'} ({len(pagina) // 1024} KB), script {js_src}")
+
+# La piattaforma rifiuta il carattere U+FFFD letterale nei file pubblicati: in ExcelJS
+# compare solo dentro stringhe, dove la sequenza di escape è equivalente.
+for js in (DIST / "assets").glob("*.js"):
+    testo = js.read_text(encoding="utf-8")
+    if "�" in testo:
+        js.write_text(testo.replace("�", "\\uFFFD"), encoding="utf-8")
+        print(f"Sostituito U+FFFD in {js.name}")

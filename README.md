@@ -14,6 +14,13 @@ Non è un portale di convenzioni: serve a noi per decidere dove e su chi lavorar
 | Aziende | Nominativi con P.IVA, ATECO, dipendenti, fatturato, PEC, distanza | Registro Imprese via Openapi, oppure file Telemaco | a consumo |
 | Confronto clienti | Carichi la lista clienti del dealer: ogni azienda diventa Già cliente, Probabile cliente, Da verificare o Nuovo | lista del dealer | gratis |
 
+Sulla **mappa** si può:
+
+- trascinare il segnaposto giallo, o usare **Esplora un punto**, per rifare l'analisi da un punto qualsiasi e salvarlo come nuovo dealer;
+- accendere e spegnere comuni, anelli, aziende e altri SuperService;
+- filtrare le aziende per intensità di flotta, stato cliente e dipendenti;
+- cliccare un comune o un'azienda per la scheda, cercare un indirizzo, andare a schermo intero.
+
 **Scarica Excel** produce un file con sei fogli:
 
 1. **Leggimi**: istruzioni per il dealer.
@@ -34,6 +41,10 @@ npm run dev
 ```
 
 L'app si apre su http://localhost:5173. Senza token Openapi funziona tutto, con aziende dimostrative.
+
+## Demo senza server
+
+`npm run build:demo` crea in `dist-demo/` una versione che funziona come pagina autonoma su claude.ai: niente chiamate esterne, aziende dimostrative già caricate, Excel scaricabile. Mappa stradale di sfondo, ricerca indirizzi e acquisto Openapi sono disattivati.
 
 ## Messa online su Vercel
 
