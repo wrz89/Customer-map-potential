@@ -1,0 +1,28 @@
+CUSTOMER MAP POTENTIAL - versione per PC Windows
+================================================
+
+AVVIO
+1. Estrai questo zip in una cartella, per esempio Documenti\Customer Map Potential.
+2. Doppio clic su "Customer-Map-Potential-Portable.exe".
+   Non serve installare nulla, non serve Python.
+3. Se compare "Windows ha protetto il PC": clic su "Ulteriori informazioni",
+   poi "Esegui comunque". Succede perché il programma non ha una firma
+   digitale a pagamento.
+
+Preferisci installarlo con icona sul desktop e nel menu Start?
+Scarica dalla stessa pagina "Customer-Map-Potential-Setup.exe".
+
+PRIMI PASSI
+- Impostazioni > Elenco dealer > Importa: un Excel con colonne Nome e Indirizzo.
+- Impostazioni > Openapi: incolla il token per acquistare i nominativi.
+  Lascia spuntato "Ambiente di prova" finché non vuoi comprare dati veri.
+- Ogni dealer: mappa, territorio, età del parco, settori, concorrenza,
+  aziende, confronto con i clienti e Scarica Excel.
+
+DATI
+- Comuni, veicoli e settori sono già dentro il programma (ISTAT, ACI-PRA).
+- Dealer, acquisti e liste clienti restano su questo PC:
+  menu File > Apri la cartella dei dati.
+- Il token Openapi è cifrato con la protezione di Windows.
+- Internet serve solo per mappa stradale, ricerca indirizzi,
+  OpenStreetMap e Openapi.

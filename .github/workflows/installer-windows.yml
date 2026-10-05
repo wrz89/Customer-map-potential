@@ -3,8 +3,11 @@ name: Installer Windows
 on:
   workflow_dispatch:
   push:
-    branches: [claude/customer-map-mvp, main]
+    branches: [main]
     paths: ['src/**', 'desktop/**', 'server/**', 'public/**', 'package.json', 'package-lock.json', '.github/workflows/installer-windows.yml']
+
+permissions:
+  contents: write
 
 jobs:
   windows:
@@ -47,3 +50,35 @@ jobs:
             release/Customer-Map-Potential-Setup-*.exe
             release/Customer-Map-Potential-Portable-*.exe
           retention-days: 30
+
+      # Su main: release scaricabile, con nomi fissi così il link "latest" non cambia mai
+      - name: Prepara i file della release
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        run: |
+          $v = (Get-Content package.json | ConvertFrom-Json).version
+          "VERSIONE=$v" | Out-File $env:GITHUB_ENV -Append
+          New-Item -ItemType Directory -Force pubblica, zip | Out-Null
+          Copy-Item (Get-ChildItem release -Filter 'Customer-Map-Potential-Portable-*.exe')[0].FullName 'zip\Customer-Map-Potential-Portable.exe'
+          Copy-Item desktop\LEGGIMI.txt zip\LEGGIMI.txt
+          Compress-Archive -Path zip\* -DestinationPath pubblica\Customer-Map-Potential-Windows.zip
+          Copy-Item (Get-ChildItem release -Filter 'Customer-Map-Potential-Setup-*.exe')[0].FullName 'pubblica\Customer-Map-Potential-Setup.exe'
+          Get-ChildItem pubblica
+      - name: Pubblica la release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.VERSIONE }}
+          name: Customer Map Potential ${{ env.VERSIONE }}
+          make_latest: true
+          body: |
+            **Scarica `Customer-Map-Potential-Windows.zip`**, estrailo e fai doppio clic su `Customer-Map-Potential-Portable.exe`. Non serve installare nulla.
+
+            In alternativa `Customer-Map-Potential-Setup.exe` installa il programma con icona sul desktop e nel menu Start.
+
+            Al primo avvio Windows può mostrare "Windows ha protetto il PC": clic su "Ulteriori informazioni", poi "Esegui comunque".
+
+            Versione installata e avviata automaticamente su Windows prima della pubblicazione.
+          files: |
+            pubblica/Customer-Map-Potential-Windows.zip
+            pubblica/Customer-Map-Potential-Setup.exe

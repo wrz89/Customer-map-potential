@@ -1,5 +1,13 @@
 # Customer Map Potential
 
+## Scarica il programma per Windows
+
+**[Scarica Customer-Map-Potential-Windows.zip](https://github.com/wrz89/Customer-map-potential/releases/latest/download/Customer-Map-Potential-Windows.zip)**: estrai lo zip e fai doppio clic su `Customer-Map-Potential-Portable.exe`. Non serve installare nulla.
+
+Oppure **[Customer-Map-Potential-Setup.exe](https://github.com/wrz89/Customer-map-potential/releases/latest/download/Customer-Map-Potential-Setup.exe)** per installarlo con icona sul desktop e nel menu Start. Tutte le versioni sono nella pagina [Releases](https://github.com/wrz89/Customer-map-potential/releases).
+
+Il pulsante verde "Code → Download ZIP" scarica invece il codice sorgente, che serve solo per modificare il programma.
+
 Web app interna per la rete SuperService. Dato un dealer e un raggio, mostra chi c'è intorno: comuni, veicoli circolanti, imprese per settore e dimensione, e l'elenco nominativo delle aziende. Scarica un Excel in cui il dealer incolla i suoi clienti e la cernita tra clienti e potenziali clienti si fa da sola.
 
 Non è un portale di convenzioni: serve a noi per decidere dove e su chi lavorare.
