@@ -46,6 +46,7 @@ export interface StatoAggiornamento {
 interface DesktopApi {
   leggiImpostazioni: () => Promise<StatoDesktop>
   salvaImpostazioni: (v: { token?: string; sandbox?: boolean}) => Promise<StatoDesktop>
+  provaToken?: () => Promise<{ ok: boolean; messaggio: string }>
   statoAggiornamento?: () => Promise<StatoAggiornamento>
   verificaAggiornamenti?: () => Promise<StatoAggiornamento>
   installaAggiornamento?: () => Promise<void>

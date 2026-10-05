@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('cmpDesktop', {
   leggiImpostazioni: () => ipcRenderer.invoke('impostazioni:leggi'),
   salvaImpostazioni: (v) => ipcRenderer.invoke('impostazioni:salva', v),
+  provaToken: () => ipcRenderer.invoke('impostazioni:prova'),
   statoAggiornamento: () => ipcRenderer.invoke('aggiornamenti:stato'),
   verificaAggiornamenti: () => ipcRenderer.invoke('aggiornamenti:verifica'),
   installaAggiornamento: () => ipcRenderer.invoke('aggiornamenti:installa'),

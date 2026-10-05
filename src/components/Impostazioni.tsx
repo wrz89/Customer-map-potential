@@ -130,6 +130,8 @@ export function Impostazioni({ imp, dealer, onSalva, onImportaDealer, onClose }:
 }
 
 function OpenapiDesktop() {
+  const [prova, setProva] = useState<'corso' | null>(null)
+  const [esitoProva, setEsitoProva] = useState<{ ok: boolean; messaggio: string } | null>(null)
   const [stato, setStato] = useState<StatoDesktop | null>(null)
   const [token, setToken] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
@@ -179,10 +181,26 @@ function OpenapiDesktop() {
         </span>
       </label>
       {stato.haToken && (
-        <button className="btn mt-2 !py-1 text-xs" onClick={async () => { setStato(await desktop!.salvaImpostazioni({ token: '' })); setMsg('Token rimosso') }}>
-          Rimuovi token
-        </button>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {desktop?.provaToken && (
+            <button
+              className="btn !py-1 text-xs"
+              disabled={prova === 'corso'}
+              onClick={async () => {
+                setProva('corso')
+                setEsitoProva(await desktop!.provaToken!())
+                setProva(null)
+              }}
+            >
+              {prova === 'corso' ? 'Provo…' : 'Prova il token'}
+            </button>
+          )}
+          <button className="btn !py-1 text-xs" onClick={async () => { setStato(await desktop!.salvaImpostazioni({ token: '' })); setMsg('Token rimosso'); setEsitoProva(null) }}>
+            Rimuovi token
+          </button>
+        </div>
       )}
+      {esitoProva && <div className="mt-2"><Avviso tipo={esitoProva.ok ? 'ok' : 'errore'}>{esitoProva.messaggio}</Avviso></div>}
       {msg && <div className="mt-2"><Avviso tipo="ok">{msg}</Avviso></div>}
       <div className="mt-3 text-[11px]" style={{ color: 'var(--muted)' }}>Versione {stato.versione} · dati in {stato.cartellaDati}</div>
     </div>

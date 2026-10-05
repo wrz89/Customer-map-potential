@@ -39,6 +39,23 @@ function parametri(r: RichiestaAziende, ateco: string | undefined) {
   return p
 }
 
+const NOME_HOST = (env: Ambiente) => (env.OPENAPI_SANDBOX === '1' ? 'test.company.openapi.com' : 'company.openapi.com')
+
+/** Messaggio in italiano per gli errori di Openapi più comuni: cosa è successo e cosa fare. */
+export function spiegaErrore(status: number, dettaglio: string, env: Ambiente): string {
+  const prova = env.OPENAPI_SANDBOX === '1'
+  const ambito = `GET ${NOME_HOST(env)}/IT-search`
+  const coppia = prova
+    ? 'Con "Ambiente di prova" spuntato serve un token creato per il sandbox.'
+    : 'Senza "Ambiente di prova" serve un token di produzione. Se hai solo quello del sandbox, rimetti la spunta.'
+  if (status === 401) return `Openapi non riconosce il token (401): è sbagliato, scaduto o incollato incompleto. ${coppia}`
+  if (status === 403) return `Il token non ha il permesso per cercare imprese (403). Alla creazione del token serve l'ambito: ${ambito}. ${coppia}`
+  if (status === 402) return `Credito insufficiente su Openapi (402). ${prova ? 'Nel sandbox assegna un credito di prova in Preferenze → Sandbox.' : 'Ricarica il portafoglio nella console.'}`
+  if (status === 429) return 'Troppe richieste a Openapi (429): aspetta un minuto e riprova.'
+  if (status >= 500) return `Openapi non risponde (${status}): riprova tra poco.`
+  return `Openapi ${status}: ${dettaglio}`
+}
+
 async function chiama(env: Ambiente, p: URLSearchParams) {
   const res = await fetch(`${host(env)}/IT-search?${p}`, {
     headers: { Authorization: `Bearer ${env.OPENAPI_TOKEN}`, Accept: 'application/json' },
@@ -52,7 +69,7 @@ async function chiama(env: Ambiente, p: URLSearchParams) {
   }
   if (!res.ok) {
     const msg = (body as { message?: string })?.message ?? res.statusText
-    throw new Error(`Openapi ${res.status}: ${msg}`)
+    throw new Error(spiegaErrore(res.status, msg, env))
   }
   return body as { data: unknown; success?: boolean; message?: string }
 }
@@ -112,6 +129,21 @@ export async function gestisci(r: RichiestaAziende, env: Ambiente) {
     }
   }
   return { demo: false, sandbox: env.OPENAPI_SANDBOX === '1', aziende, troncato: aziende.length >= max }
+}
+
+/** Prova gratuita del token: una ricerca dryRun (solo conteggio) su Milano, nell'ambiente scelto. */
+export async function provaToken(env: Ambiente): Promise<{ ok: boolean; messaggio: string }> {
+  if (!env.OPENAPI_TOKEN) return { ok: false, messaggio: 'Nessun token inserito: incollalo qui sopra e salva.' }
+  try {
+    const p = parametri({ azione: 'stima', lat: 45.4642, lon: 9.19, raggioKm: 1 }, undefined)
+    p.set('dryRun', '1')
+    const body = await chiama(env, p)
+    const s = leggiStima(body)
+    const dove = env.OPENAPI_SANDBOX === '1' ? 'ambiente di prova (sandbox)' : 'produzione'
+    return { ok: true, messaggio: `Il token funziona in ${dove}.${s.conteggio !== null ? ` Risposta di prova: ${s.conteggio} imprese${s.prezzo !== null ? `, costo stimato ${s.prezzo} €` : ''}.` : ''}` }
+  } catch (e) {
+    return { ok: false, messaggio: (e as Error).message }
+  }
 }
 
 /** Con il token Openapi configurato la password è obbligatoria: protegge il credito. */

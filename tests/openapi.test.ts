@@ -50,3 +50,14 @@ describe('Openapi', () => {
     expect(readFileSync('api/companies.ts', 'utf-8')).toContain('gestisci')
   })
 })
+
+describe('messaggi di errore Openapi', async () => {
+  const { spiegaErrore } = await import('../server/openapi')
+  it('401 e 403 spiegano ambiente e ambito da scegliere', () => {
+    expect(spiegaErrore(401, '', { OPENAPI_SANDBOX: '1' })).toMatch(/token creato per il sandbox/)
+    expect(spiegaErrore(403, '', { OPENAPI_SANDBOX: '1' })).toContain('GET test.company.openapi.com/IT-search')
+    expect(spiegaErrore(403, '', { OPENAPI_SANDBOX: '0' })).toContain('GET company.openapi.com/IT-search')
+    expect(spiegaErrore(402, '', {})).toMatch(/Credito insufficiente/)
+    expect(spiegaErrore(418, 'x', {})).toBe('Openapi 418: x')
+  })
+})

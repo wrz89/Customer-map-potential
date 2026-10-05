@@ -6,7 +6,7 @@ const { app, BrowserWindow, Menu, ipcMain, net, protocol, safeStorage, shell, di
 const fs = require('node:fs')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
-const { gestisci } = require('./build/openapi.cjs')
+const { gestisci, provaToken } = require('./build/openapi.cjs')
 const aggiornamenti = require('./aggiornamenti.cjs')
 
 const SCHEMA = 'app'
@@ -224,6 +224,7 @@ if (!app.requestSingleInstanceLock()) {
     protocol.handle(SCHEMA, gestisciRichiesta)
     ipcMain.handle('impostazioni:leggi', () => statoImpostazioni())
     ipcMain.handle('impostazioni:salva', (_e, v) => salvaImpostazioni(v || {}))
+    ipcMain.handle('impostazioni:prova', () => provaToken({ OPENAPI_TOKEN: token(), OPENAPI_SANDBOX: statoImpostazioni().sandbox ? '1' : '0' }))
     aggiornamenti.avvia(ipcMain)
     menu()
     finestra = creaFinestra()

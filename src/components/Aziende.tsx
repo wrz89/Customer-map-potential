@@ -70,7 +70,11 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
     try {
       const r = await acquistaOpenapi(zona.centro, zona.raggioKm, filtri, chiaveApp)
       await onNuovoAcquisto(nuovoAcquisto('openapi', r.aziende, stima.prezzo))
-      setInfo(`Acquistate ${r.aziende.length} aziende${r.troncato ? ' (risultato troncato al massimo consentito: restringi i filtri)' : ''}.`)
+      const dentro = r.aziende.filter((a) => a.distanzaKm === null || a.distanzaKm <= zona.raggioKm).length
+      setInfo(
+        `Acquistate ${r.aziende.length} aziende${r.troncato ? ' (risultato troncato al massimo consentito: restringi i filtri)' : ''}.` +
+          (r.sandbox ? ` AMBIENTE DI PROVA: sono dati di esempio${dentro < r.aziende.length ? `, solo ${dentro} cadono nel raggio di questo dealer, quindi in tabella ne vedi poche o nessuna` : ''}. Per dati veri togli la spunta in Impostazioni.` : ''),
+      )
       setStima(null)
     } catch (e) {
       setErrore((e as Error).message)

@@ -135,7 +135,7 @@ export function stimaOpenapi(centro: { lat: number; lon: number }, raggioKm: num
 }
 
 export async function acquistaOpenapi(centro: { lat: number; lon: number }, raggioKm: number, f: FiltriAcquisto, chiave: string) {
-  const r = await post<{ demo: boolean; aziende?: OpenapiRecord[]; troncato?: boolean }>(
+  const r = await post<{ demo: boolean; sandbox?: boolean; aziende?: OpenapiRecord[]; troncato?: boolean }>(
     { azione: 'acquista', lat: centro.lat, lon: centro.lon, raggioKm, ...f },
     chiave,
   )
