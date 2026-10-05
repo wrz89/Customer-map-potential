@@ -168,7 +168,8 @@ class Gestore(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self._host_valido():
             return self._json(403, {"errore": "Richiesta non ammessa"})
-        if self.path.split("?")[0] != "/api/companies":
+        percorso = self.path.split("?")[0]
+        if percorso != "/api/companies":
             return self._json(404, {"errore": "Non trovato"})
         origine = self.headers.get("Origin")
         if origine and urllib.parse.urlparse(origine).netloc not in HOST_AMMESSI:

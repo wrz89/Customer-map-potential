@@ -44,7 +44,7 @@ describe('export Excel', () => {
 
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.readFile(file)
-    expect(wb.worksheets.map((w) => w.name)).toEqual(['Leggimi', 'Riepilogo', 'Aziende', 'Clienti dealer', 'Comuni', 'Settori ISTAT'])
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Leggimi', 'Riepilogo', 'Aziende', 'Clienti dealer', 'Comuni', 'Settori ISTAT', 'Concorrenza'])
     expect(wb.getWorksheet('Comuni')!.actualRowCount).toBeGreaterThan(10)
 
     if (!soffice) return // senza LibreOffice si verifica solo la struttura

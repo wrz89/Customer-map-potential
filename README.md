@@ -70,15 +70,38 @@ L'app si apre su http://localhost:5173. Senza token Openapi funziona tutto, con 
 
 Il piano gratuito di Vercel basta. I dati statici pesano circa 24 MB e la mappa carica solo le province vicine al dealer.
 
-## Openapi: come si paga
+## Dati reali: API e costi
+
+Prezzi verificati il 5 ottobre 2026 sui siti dei fornitori, IVA esclusa dove non indicato.
+
+| Fonte | Per cosa | Prezzo | Gratis |
+|---|---|---|---|
+| ISTAT e ACI-PRA | comuni, veicoli, età del parco, settori | 0 € | tutto, già nel pacchetto |
+| OpenStreetMap | concorrenza di base | 0 € | tutto, ma copre circa un gommista su dieci |
+| Openapi, ricerca aziende con dettaglio "advanced" | aziende con ATECO, dipendenti, fatturato, PEC, coordinate | 0,10 € + IVA | stima del costo: 100 al giorno |
+| Openapi, stessa ricerca per i gommisti ATECO 45.20.40 | concorrenza completa | 0,10 € + IVA | come sopra |
+| Telemaco, elenco "Indirizzi" | gommisti di una provincia, solo nome e indirizzo | 5 € a elenco + 0,02 € a impresa, esente IVA | nessuno |
+| Telemaco, elenco "Esteso" | aziende con addetti e fatturato, senza coordinate | 5 € a elenco + 0,12 € a impresa, esente IVA | nessuno |
+
+Openapi non chiarisce se gli 0,10 € valgono per ogni chiamata o per ogni azienda restituita. La **Stima costo** nell'app chiede il prezzo esatto a Openapi prima di comprare: fai la prima prova nell'ambiente di test. Fonti: openapi.com/products/italian-company-search, registroimprese.it/elenchi-di-imprese.
+
+**Google Places non si usa**: le condizioni Google, punto 3.2.3, vietano di mostrare i dati Places su mappe non Google e di salvarne nomi e indirizzi, quindi anche l'Excel.
+
+### Openapi: attivazione
 
 1. Registrati su console.openapi.com e attiva il servizio **Company**.
-2. Ricarica il credito: si paga a consumo, senza canone.
-3. Crea un token con accesso a `IT-search` e mettilo in `OPENAPI_TOKEN`.
+2. Ricarica il portafoglio prepagato: carta, PayPal o bonifico, senza canone. C'è anche la ricarica automatica.
+3. Crea un token con accesso a `IT-search`, anche per l'ambiente di test.
+4. App locale: incolla il token in `impostazioni.txt` alla riga `OPENAPI_TOKEN=`, lascia `OPENAPI_SANDBOX=1` per la prova e riavvia. Per i dati veri metti `OPENAPI_SANDBOX=0`.
+5. Nell'app: **Aziende → Stima costo → Acquista** per i clienti potenziali, **Territorio → Concorrenza → Stima con Openapi** per i gommisti.
 
-Nell'app, **Stima costo** chiede a Openapi quante aziende ci sono e quanto costano, senza spendere. **Acquista** chiede conferma con il prezzo davanti. Gli acquisti finiscono nel **registro** del dealer, così la stessa zona non si ricompra.
+Gli acquisti restano nel registro del dealer, così la stessa zona non si ricompra.
 
-Prova prima con `OPENAPI_SANDBOX=1`: la forma esatta della risposta di stima va verificata con il primo token. L'app la legge in modo tollerante, ma se mostra "prezzo n.d." serve un ritocco a `server/openapi.ts`.
+### Telemaco: elenco gommisti di una provincia
+
+1. Su registroimprese.it, **Elenchi di imprese**: filtra per provincia e attività **45.20.40**, solo imprese attive.
+2. Scegli il formato **Indirizzi**. Il prezzo appare prima dell'acquisto.
+3. Scarica il CSV e caricalo in **Territorio → Concorrenza → Importa elenco Telemaco**. Ogni gommista compare al centro del suo comune.
 
 ## Da sapere sui dati
 

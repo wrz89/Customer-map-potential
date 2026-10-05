@@ -5,6 +5,7 @@ import type { Feature, MultiPolygon, Polygon } from 'geojson'
 import { CATEGORIE, categoriaDaAteco, type Flotta } from './categories'
 import {
   loadComuni,
+  loadConcorrenzaProvincia,
   loadGeoProvincia,
   loadUnitaLocaliProvincia,
   type Comune,
@@ -26,6 +27,8 @@ export interface Totali {
   ulClassi: [number, number, number, number]
   addClassi: [number, number, number, number]
   officine: number
+  /** autovetture per classe Euro 0-6 */
+  euro: number[]
 }
 
 export interface ComuneZona {
@@ -57,6 +60,21 @@ export interface CategoriaZona {
   addClassi: [number, number, number, number]
 }
 
+export interface Concorrente {
+  lat: number
+  lon: number
+  gommista: boolean
+  rete: string
+  gruppo: string
+  nome: string
+  distanzaKm: number
+  fonte?: 'osm' | 'registro'
+  indirizzo?: string
+  piva?: string
+  /** posizione approssimata al centro del comune (elenco importato senza coordinate) */
+  centroComune?: boolean
+}
+
 export interface Zona {
   centro: { lat: number; lon: number }
   raggioKm: number
@@ -68,11 +86,15 @@ export interface Zona {
   categorie: CategoriaZona[]
   geometrie: Feature<Polygon | MultiPolygon, { c: string; quota: number }>[]
   annoVeicoli: number | null
+  /** gommisti e officine concorrenti dentro il raggio */
+  concorrenti: Concorrente[]
+  infoConcorrenza?: { stato: 'carico' | 'ok' | 'errore' | 'assente'; data?: string; errore?: string; osm: number; registro: number }
 }
 
 export const vuoto = (): Totali => ({
   pop: 0, autovetture: 0, autocarri: 0, pesanti: 0, motocicli: 0, autobus: 0, altriVeicoli: 0,
   unitaLocali: 0, addetti: 0, ulClassi: [0, 0, 0, 0], addClassi: [0, 0, 0, 0], officine: 0,
+  euro: [0, 0, 0, 0, 0, 0, 0],
 })
 
 function totaliComune(c: Comune, ul: UnitaLocaliComune | undefined, k: number): Totali {
@@ -85,6 +107,7 @@ function totaliComune(c: Comune, ul: UnitaLocaliComune | undefined, k: number): 
     t.motocicli = c.veh.motocicli * k
     t.autobus = c.veh.autobus * k
     t.altriVeicoli = c.veh.altri * k
+    if (c.veh.euro) t.euro = c.veh.euro.map((v) => v * k)
   }
   t.officine = (c.off ?? 0) * k
   const tot = ul?.['0010']
@@ -113,6 +136,7 @@ export function somma(a: Totali, b: Totali): Totali {
     ulClassi: a.ulClassi.map((v, i) => v + b.ulClassi[i]) as Totali['ulClassi'],
     addClassi: a.addClassi.map((v, i) => v + b.addClassi[i]) as Totali['addClassi'],
     officine: a.officine + b.officine,
+    euro: a.euro.map((v, i) => v + b.euro[i]),
   }
 }
 
@@ -123,10 +147,18 @@ export async function calcolaZona(lat: number, lon: number, raggioKm: number): P
   // può avere parte del territorio dentro il raggio.
   const candidati = tutti.filter((c) => distanzaKm(lat, lon, c.lat, c.lon) <= raggioKm + 20)
   const province = [...new Set(candidati.map((c) => c.pc))]
-  const [geos, uls] = await Promise.all([
+  const [geos, uls, offs] = await Promise.all([
     Promise.all(province.map(loadGeoProvincia)),
+    Promise.all(province.map(loadConcorrenzaProvincia)),
     Promise.all(province.map((p) => loadUnitaLocaliProvincia(p).catch(() => ({}) as Record<string, UnitaLocaliComune>))),
-  ])
+  ]).then(([g, o, u]) => [g, u, o] as const)
+  const concorrenti: Concorrente[] = []
+  for (const lista of offs)
+    for (const [la, lo, tipo, rete, gruppo, nome] of lista) {
+      const d = distanzaKm(lat, lon, la, lo)
+      if (d <= raggioKm) concorrenti.push({ lat: la, lon: lo, gommista: tipo === 'g', rete, gruppo, nome, distanzaKm: Math.round(d * 10) / 10 })
+    }
+  concorrenti.sort((a, b) => a.distanzaKm - b.distanzaKm)
   const geoByCode = new Map<string, Feature<Polygon | MultiPolygon, { c: string }>>()
   for (const fc of geos) for (const f of fc.features) geoByCode.set(f.properties.c, f)
   const ulByCode = new Map<string, UnitaLocaliComune>()
@@ -221,5 +253,6 @@ export async function calcolaZona(lat: number, lon: number, raggioKm: number): P
     categorie,
     geometrie,
     annoVeicoli: comuni.find((z) => z.comune.veh)?.comune.veh?.anno ?? null,
+    concorrenti,
   }
 }

@@ -8,6 +8,8 @@ export interface Veicoli {
   motocicli: number
   autobus: number
   altri: number
+  /** autovetture per classe Euro, da Euro 0 a Euro 6 */
+  euro?: number[]
 }
 
 export interface Comune {
@@ -63,5 +65,8 @@ export const loadProvince = () => getJson<Provincia[]>('province.json')
 export const loadMeta = () => getJson<Meta>('meta.json')
 export const loadGeoProvincia = (pc: number) =>
   getJson<GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon, { c: string }>>(`geo/P_${pc}.json`)
+/** [lat, lon, tipo 'g'|'o', rete, gruppo, nome] da OpenStreetMap */
+export type OfficinaOsm = [number, number, 'g' | 'o', string, string, string]
+export const loadConcorrenzaProvincia = (pc: number) => getJson<OfficinaOsm[]>(`concorrenza/P_${pc}.json`).catch(() => [] as OfficinaOsm[])
 export const loadUnitaLocaliProvincia = (pc: number) =>
   getJson<Record<string, UnitaLocaliComune>>(`ul/P_${pc}.json`)

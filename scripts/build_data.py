@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 import urllib.request
 from collections import defaultdict
@@ -132,8 +133,10 @@ def load_vehicles(path: Path) -> dict[str, dict]:
                 anni[code] = anno
                 raw[code] = {}
             raw[code][row["VEHICLE_TYPE"]] = float(row["OBS_VALUE"])
+    # classi Euro delle autovetture: codici ISTAT 13 (Euro 0) ... 19 (Euro 6)
     return {
-        code: {k: int(sum(v.get(t, 0) for t in tipi)) for k, tipi in VEICOLI.items()} | {"anno": anni[code]}
+        code: {k: int(sum(v.get(t, 0) for t in tipi)) for k, tipi in VEICOLI.items()}
+        | {"euro": [int(v.get(str(13 + i), 0)) for i in range(7)], "anno": anni[code]}
         for code, v in raw.items()
     }
 
@@ -167,6 +170,71 @@ def load_local_units(path: Path):
 def ateco_labels(path: Path) -> dict[str, str]:
     codes = json.loads(path.read_text(encoding="utf-8"))["data"]["codelists"][0]["codes"]
     return {c["id"]: (c.get("name") or "").strip() for c in codes}
+
+
+# Reti di centri pneumatici e officine riconosciute dal nome o dal marchio in OpenStreetMap.
+# Il gruppo è indicato solo dove l'appartenenza è certa.
+RETI = [
+    ("SuperService", "Goodyear", r"super\s*-?\s*service"),
+    ("Driver Center", "Pirelli", r"\bdriver\s*-?\s*cent(er|re)\b|\bpirelli\b"),
+    ("First Stop", "Bridgestone", r"first\s*-?\s*stop"),
+    ("Euromaster", "Michelin", r"euromaster"),
+    ("BestDrive", "Continental", r"best\s*-?\s*drive"),
+    ("Point S", "", r"\bpoint\s*-?\s*s\b"),
+    ("Vulco", "", r"\bvulco\b"),
+    ("Vianor", "", r"\bvianor\b"),
+    ("Bosch Car Service", "Bosch", r"bosch\s*car"),
+    ("Speedy", "", r"\bspeedy\b"),
+    ("Norauto", "", r"\bnorauto\b"),
+    ("Midas", "", r"\bmidas\b"),
+    ("Eurorepar", "", r"euro\s*-?\s*repar"),
+]
+PAROLE_GOMME = re.compile(r"gomm|pneumat|tyre|\btire|gommist", re.I)
+
+
+def classifica_officina(tags: dict) -> tuple[str, str, str]:
+    """Ritorna (tipo, rete, gruppo): tipo 'g' gommista, 'o' altra officina."""
+    testo = " ".join(tags.get(k, "") for k in ("brand", "name", "operator", "network"))
+    rete = gruppo = ""
+    for nome, gr, regex in RETI:
+        if re.search(regex, testo, re.I):
+            rete, gruppo = nome, gr
+            break
+    gommista = (
+        tags.get("shop") == "tyres"
+        or tags.get("craft") == "tyres"
+        or tags.get("service:tyres") == "yes"
+        or bool(PAROLE_GOMME.search(testo))
+    )
+    return ("g" if gommista else "o"), rete, gruppo
+
+
+def officine_osm(path: Path, geo_feats: list) -> dict[int, list]:
+    """Assegna ogni officina OSM alla provincia del comune in cui cade."""
+    if not path.exists():
+        print("ATTENZIONE: officine OSM assenti (scripts/scarica_officine_osm.py), niente concorrenza")
+        return {}
+    from shapely import STRtree
+    from shapely.geometry import Point
+
+    geoms = [shape(f["geometry"]) for f in geo_feats]
+    prov = [int(f["properties"]["prov_istat_code_num"]) for f in geo_feats]
+    albero = STRtree(geoms)
+    out: dict[int, list] = defaultdict(list)
+    for e in json.loads(path.read_text(encoding="utf-8")):
+        lat = e.get("lat") or (e.get("center") or {}).get("lat")
+        lon = e.get("lon") or (e.get("center") or {}).get("lon")
+        if lat is None or lon is None:
+            continue
+        tags = e.get("tags", {})
+        pt = Point(lon, lat)
+        dentro = [i for i in albero.query(pt) if geoms[i].contains(pt)]
+        if not dentro:
+            continue
+        tipo, rete, gruppo = classifica_officina(tags)
+        nome = tags.get("name") or tags.get("brand") or ""
+        out[prov[dentro[0]]].append([round(lat, 5), round(lon, 5), tipo, rete, gruppo, nome])
+    return out
 
 
 def norm_nome(s: str) -> str:
@@ -280,6 +348,15 @@ def main() -> None:
     for prov, units in ul_by_prov.items():
         (OUT / "ul" / f"P_{prov}.json").write_text(json.dumps(units, separators=(",", ":")), encoding="utf-8")
 
+    off_osm = officine_osm(RAW / "osm_officine.json", geo["features"])
+    if off_osm:
+        (OUT / "concorrenza").mkdir(parents=True, exist_ok=True)
+        for prov, righe in off_osm.items():
+            (OUT / "concorrenza" / f"P_{prov}.json").write_text(json.dumps(righe, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+        tot = sum(len(r) for r in off_osm.values())
+        gomm = sum(1 for r in off_osm.values() for x in r if x[2] == "g")
+        print(f"Officine OSM: {tot}, di cui gommisti {gomm}")
+
     (OUT / "comuni.json").write_text(json.dumps(comuni, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     province = [
         {"pc": k, **prov_meta[k], "bbox": [r4(x) for x in prov_bbox[k]]} for k in sorted(prov_bbox)
@@ -295,6 +372,7 @@ def main() -> None:
             "unita_locali": "ISTAT, registro ASIA unità locali, anno 2023",
             "veicoli": f"ISTAT su dati ACI-PRA, parco veicolare per comune al 31/12/{max(v['anno'] for v in veh.values())}",
             "officine": "ISTAT, registro ASIA unità locali ATECO 45.2 (manutenzione e riparazione autoveicoli), anno 2023",
+            "concorrenza": "© OpenStreetMap contributors (ODbL), gommisti e officine mappati" if (RAW / "osm_officine.json").exists() else None,
         },
     }
     (OUT / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")

@@ -3,6 +3,7 @@
 import { DEMO } from './ambiente'
 import { categoriaDaAteco, type Flotta } from './categories'
 import { distanzaKm } from './geo'
+import { indovinaColonne, leggiTabella, numero } from './leggiFile'
 import type { Zona } from './zone'
 
 export type Fonte = 'openapi' | 'import' | 'demo'
@@ -216,4 +217,42 @@ export function generaDemo(zona: Zona, minDipendenti = 10): Azienda[] {
     }
   }
   return out.sort((a, b) => (b.dipendenti ?? 0) - (a.dipendenti ?? 0))
+}
+
+/* ---------- Import da file (Telemaco o altro elenco) ---------- */
+
+/** Legge un elenco di imprese; senza coordinate, ogni impresa va al centro del suo comune se è nella zona. */
+export async function importaElenco(file: File, zona: Zona): Promise<Azienda[]> {
+  const { intestazioni, righe } = await leggiTabella(file)
+  const m = indovinaColonne(intestazioni)
+  if (!m.ragioneSociale) throw new Error(`Non trovo la colonna con la ragione sociale. Colonne lette: ${intestazioni.join(', ')}`)
+  const perNome = new Map(zona.comuni.map((z) => [z.comune.n.toUpperCase(), z.comune]))
+  return righe
+    .filter((r) => r[m.ragioneSociale!])
+    .map((r, i) => {
+      const comune = m.comune ? r[m.comune] : ''
+      const c = perNome.get(comune.toUpperCase())
+      return arricchisci(
+        {
+          id: `imp-${file.name}-${i}`,
+          ragioneSociale: r[m.ragioneSociale!],
+          piva: m.piva ? r[m.piva] : '',
+          ateco: m.ateco ? formattaAteco(r[m.ateco]) : '',
+          atecoDescr: '',
+          dipendenti: m.dipendenti ? numero(r[m.dipendenti]) : null,
+          fatturato: m.fatturato ? numero(r[m.fatturato]) : null,
+          annoBilancio: null,
+          formaGiuridica: '',
+          indirizzo: m.indirizzo ? r[m.indirizzo] : '',
+          cap: m.cap ? r[m.cap] : '',
+          comune,
+          provincia: m.provincia ? r[m.provincia] : (c?.p ?? ''),
+          pec: m.pec ? r[m.pec] : '',
+          lat: c?.lat ?? null,
+          lon: c?.lon ?? null,
+          fonte: 'import',
+        },
+        zona.centro,
+      )
+    })
 }

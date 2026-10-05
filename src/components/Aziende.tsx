@@ -1,9 +1,8 @@
 import { Coins, Database, FileUp, FlaskConical, Search, Trash2 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { CATEGORIE } from '../lib/categories'
-import { acquistaOpenapi, arricchisci, formattaAteco, generaDemo, stimaOpenapi, type Azienda, type StimaOpenapi } from '../lib/companies'
+import { acquistaOpenapi, generaDemo, importaElenco, stimaOpenapi, type Azienda, type StimaOpenapi } from '../lib/companies'
 import { eur, n0, n1 } from '../lib/fmt'
-import { indovinaColonne, leggiTabella, numero } from '../lib/leggiFile'
 import type { Acquisto, Dealer } from '../lib/store'
 import type { Zona } from '../lib/zone'
 import { Avviso, BottoneConferma, FlottaBadge, Sezione, Tabella, type Colonna } from './ui'
@@ -92,39 +91,7 @@ export default function Aziende({ zona, dealer, aziende, acquisti, chiaveApp, on
     setErrore(null)
     setOccupato('import')
     try {
-      const { intestazioni, righe } = await leggiTabella(file)
-      const m = indovinaColonne(intestazioni)
-      if (!m.ragioneSociale) throw new Error(`Non trovo la colonna con la ragione sociale. Colonne lette: ${intestazioni.join(', ')}`)
-      // senza coordinate: si posiziona l'azienda sul centro del suo comune, se è nel raggio
-      const perNome = new Map(zona.comuni.map((z) => [z.comune.n.toUpperCase(), z.comune]))
-      const lista = righe
-        .filter((r) => r[m.ragioneSociale!])
-        .map((r, i) => {
-          const comune = m.comune ? r[m.comune] : ''
-          const c = perNome.get(comune.toUpperCase())
-          return arricchisci(
-            {
-              id: `imp-${file.name}-${i}`,
-              ragioneSociale: r[m.ragioneSociale!],
-              piva: m.piva ? r[m.piva] : '',
-              ateco: m.ateco ? formattaAteco(r[m.ateco]) : '',
-              atecoDescr: '',
-              dipendenti: m.dipendenti ? numero(r[m.dipendenti]) : null,
-              fatturato: m.fatturato ? numero(r[m.fatturato]) : null,
-              annoBilancio: null,
-              formaGiuridica: '',
-              indirizzo: m.indirizzo ? r[m.indirizzo] : '',
-              cap: m.cap ? r[m.cap] : '',
-              comune,
-              provincia: m.provincia ? r[m.provincia] : c?.p ?? '',
-              pec: m.pec ? r[m.pec] : '',
-              lat: c?.lat ?? null,
-              lon: c?.lon ?? null,
-              fonte: 'import',
-            },
-            zona.centro,
-          )
-        })
+      const lista = await importaElenco(file, zona)
       await onNuovoAcquisto(nuovoAcquisto('import', lista, null))
       const senza = lista.filter((a) => a.lat === null).length
       setInfo(`Importate ${lista.length} aziende da ${file.name}.${senza ? ` ${senza} senza comune riconosciuto nel raggio: compaiono in tabella ma non in mappa.` : ''}`)

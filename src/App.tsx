@@ -25,8 +25,10 @@ import { Avviso, Kpi } from './components/ui'
 import type { Azienda } from './lib/companies'
 import { DEMO, salvaFile } from './lib/ambiente'
 import { generaDemo } from './lib/companies'
+import { caricaConcorrenzaOsm, daRegistro, unisciConcorrenti } from './lib/concorrenza'
 import { loadComuni, loadMeta, type Meta } from './lib/data'
-import { compatto, n0 } from './lib/fmt'
+import { quotaVecchie } from './lib/eta'
+import { compatto, n0, pct } from './lib/fmt'
 import { distanzaKm } from './lib/geo'
 import { confronta, preparaClienti, type Cliente, type EsitoMatch } from './lib/match'
 import {
@@ -44,7 +46,7 @@ import {
   type Dealer,
   type ListaClienti,
 } from './lib/store'
-import { calcolaZona, type Zona } from './lib/zone'
+import { calcolaZona, type Concorrente, type Zona } from './lib/zone'
 
 type Tab = 'mappa' | 'territorio' | 'settori' | 'aziende' | 'confronto'
 const TABS: { id: Tab; nome: string }[] = [
@@ -143,6 +145,48 @@ export default function App() {
     if (selId) ricaricaDati(selId)
   }, [selId, ricaricaDati])
 
+  // concorrenza: OpenStreetMap (gratis, parziale) + gommisti del Registro Imprese acquistati o importati
+  const [osm, setOsm] = useState<{ chiave: string; stato: 'carico' | 'ok' | 'errore' | 'assente'; concorrenti: Concorrente[]; data?: string; errore?: string } | null>(null)
+  const chiaveZona = zona ? `${zona.centro.lat},${zona.centro.lon},${zona.raggioKm}` : ''
+  const caricaOsm = useCallback(
+    (z: Zona, forza = false) => {
+      const k = `${z.centro.lat},${z.centro.lon},${z.raggioKm}`
+      if (DEMO) return setOsm({ chiave: k, stato: 'assente', concorrenti: [] })
+      setOsm({ chiave: k, stato: 'carico', concorrenti: [] })
+      caricaConcorrenzaOsm(z.centro.lat, z.centro.lon, z.raggioKm, forza)
+        .then((r) => setOsm((x) => (x?.chiave === k ? { chiave: k, stato: 'ok', concorrenti: r.concorrenti, data: r.data } : x)))
+        .catch((e) => setOsm((x) => (x?.chiave === k ? { chiave: k, stato: 'errore', concorrenti: [], errore: (e as Error).message } : x)))
+    },
+    [],
+  )
+  useEffect(() => {
+    if (zona && osm?.chiave !== chiaveZona) caricaOsm(zona)
+  }, [zona, chiaveZona, osm?.chiave, caricaOsm])
+
+  const registro = useMemo(() => {
+    if (!zona) return []
+    const lista = acquisti.filter((a) => a.scopo === 'concorrenza').flatMap((a) => a.aziende)
+    const unici = [...new Map(lista.map((a) => [a.piva || a.id, a])).values()]
+    return daRegistro(unici, zona.centro.lat, zona.centro.lon, zona.raggioKm)
+  }, [acquisti, zona])
+
+  const zonaVista = useMemo<Zona | null>(() => {
+    if (!zona) return null
+    const osmOk = osm?.chiave === chiaveZona ? osm : null
+    const conc = unisciConcorrenti(registro, osmOk?.concorrenti ?? [])
+    return {
+      ...zona,
+      concorrenti: conc,
+      infoConcorrenza: {
+        stato: osmOk?.stato ?? 'carico',
+        data: osmOk?.data,
+        errore: osmOk?.errore,
+        osm: conc.filter((c) => c.fonte === 'osm').length,
+        registro: registro.length,
+      },
+    }
+  }, [zona, osm, chiaveZona, registro])
+
   // demo: al primo calcolo di un dealer si generano le aziende dimostrative, così la mappa è subito piena
   const demoFatti = useRef(new Set<string>())
   useEffect(() => {
@@ -190,6 +234,7 @@ export default function App() {
     if (!sel) return []
     const m = new Map<string, Azienda>()
     for (const acq of acquisti) {
+      if (acq.scopo === 'concorrenza') continue
       for (const a of acq.aziende) {
         const k = a.piva || a.id
         const prima = m.get(k)
@@ -217,7 +262,7 @@ export default function App() {
       const soggetto: Dealer = esplorato
         ? { ...sel, id: 'esplorato', nome: `Punto esplorato ${esplorato.nome}`, indirizzo: `${esplorato.lat.toFixed(5)}, ${esplorato.lon.toFixed(5)}`, lat: esplorato.lat, lon: esplorato.lon }
         : sel
-      const blob = await creaExcel({ dealer: soggetto, zona, meta, aziende, clienti: lista?.clienti, esiti: lista ? esiti : undefined })
+      const blob = await creaExcel({ dealer: soggetto, zona: zonaVista ?? zona, meta, aziende, clienti: lista?.clienti, esiti: lista ? esiti : undefined })
       await salvaFile(nomeFile(soggetto, raggio), blob)
     } catch (e) {
       const codice = (e as { code?: string }).code
@@ -345,7 +390,7 @@ export default function App() {
 
             <div className="grid grid-cols-2 gap-2 px-5 pt-4 sm:grid-cols-4 xl:grid-cols-8">
               <Kpi icona={<Users size={12} />} label="Abitanti" valore={compatto(t?.pop)} sotto={zona ? `${zona.comuni.length} comuni` : undefined} />
-              <Kpi icona={<Car size={12} />} label="Autovetture" valore={compatto(t?.autovetture)} sotto={zona?.annoVeicoli ? `parco ${zona.annoVeicoli}` : undefined} />
+              <Kpi icona={<Car size={12} />} label="Autovetture" valore={compatto(t?.autovetture)} sotto={t && zona?.annoVeicoli ? `${pct(quotaVecchie(t.euro))} prima del 2006` : undefined} />
               <Kpi icona={<Truck size={12} />} label="Veicoli merci" valore={compatto(t?.autocarri)} sotto={t ? `+ ${compatto(t.pesanti)} pesanti e rimorchi` : undefined} />
               <Kpi icona={<Building2 size={12} />} label="Unità locali" valore={compatto(t?.unitaLocali)} sotto="sedi operative" />
               <Kpi icona={<Users size={12} />} label="Addetti" valore={compatto(t?.addetti)} sotto="nelle unità locali" />
@@ -375,7 +420,7 @@ export default function App() {
               {(
                 <div className="card relative overflow-hidden" style={{ height: 'max(460px, calc(100vh - 290px))', display: tab === 'mappa' ? undefined : 'none' }}>
                   <MapView
-                    zona={zona}
+                    zona={zonaVista}
                     centro={centro}
                     altriDealer={esplorato ? dealer : altri}
                     aziende={aziende}
@@ -396,14 +441,31 @@ export default function App() {
                   />
                 </div>
               )}
-              {tab === 'territorio' && zona && <Territorio zona={zona} evidenziato={comuneEvid} />}
+              {tab === 'territorio' && zonaVista && sel && (
+                <Territorio
+                  zona={zonaVista}
+                  evidenziato={comuneEvid}
+                  onAggiornaOsm={() => zona && caricaOsm(zona, true)}
+                  dealer={sel}
+                  chiaveApp={imp.chiaveApp}
+                  acquistiConcorrenza={acquisti.filter((a) => a.scopo === 'concorrenza')}
+                  onNuovoAcquisto={async (a) => {
+                    await salvaAcquisto(a)
+                    await ricaricaDati(sel.id)
+                  }}
+                  onElimina={async (id) => {
+                    await eliminaAcquisto(id)
+                    await ricaricaDati(sel.id)
+                  }}
+                />
+              )}
               {tab === 'settori' && zona && <Settori zona={zona} meta={meta} />}
               {tab === 'aziende' && zona && (
                 <Aziende
                   zona={zona}
                   dealer={sel}
                   aziende={aziende}
-                  acquisti={acquisti}
+                  acquisti={acquisti.filter((a) => a.scopo !== 'concorrenza')}
                   chiaveApp={imp.chiaveApp}
                   onNuovoAcquisto={async (a) => {
                     await salvaAcquisto(a)

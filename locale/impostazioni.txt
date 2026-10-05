@@ -10,3 +10,4 @@ OPENAPI_SANDBOX=1
 
 # Facoltativa: se la imposti, l'app la chiede prima di stimare o acquistare.
 APP_PASSWORD=
+

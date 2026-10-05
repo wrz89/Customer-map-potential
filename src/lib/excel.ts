@@ -4,6 +4,7 @@
 // da solo, senza macro.
 import ExcelJS from 'exceljs'
 import { CLASSI_ADDETTI, categoriaDaAteco } from './categories'
+import { GRUPPI_EURO, quoteEuro } from './eta'
 import type { Azienda } from './companies'
 import type { Meta } from './data'
 import { etichettaAnello } from './geo'
@@ -95,6 +96,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
   const cl = wb.addWorksheet('Clienti dealer', { views: [{ state: 'frozen', ySplit: 1 }], properties: { tabColor: { argb: 'FFEDA100' } } })
   const co = wb.addWorksheet('Comuni', { views: [{ state: 'frozen', ySplit: 1, xSplit: 1 }] })
   const se = wb.addWorksheet('Settori ISTAT', { views: [{ state: 'frozen', ySplit: 1 }] })
+  const cc = wb.addWorksheet('Concorrenza', { views: [{ state: 'frozen', ySplit: 1 }] })
   titolo(lg, `Potenziale clienti · ${dealer.nome}`, `Raggio ${zona.raggioKm} km da ${dealer.indirizzo} · generato il ${oggi}`)
   const istruzioni = [
     ['Come fare la cernita dei clienti'],
@@ -236,6 +238,17 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
   for (let c = 2; c <= 11; c++) rp.getColumn(c).numFmt = intero
 
   r += 2
+  rp.getCell(`A${r}`).value = 'Età del parco auto (quota delle autovetture)'
+  rp.getCell(`A${r}`).font = { bold: true, color: { argb: BLU }, size: 12 }
+  r++
+  intestazione(rp, r, ['Fascia', ...GRUPPI_EURO.map((g) => `${g.nome} (${g.periodo})`)])
+  ;[...zona.anelli.map((a, i) => [etichettaAnello(i, zona.limitiAnelli), a.euro] as const), ['Totale', zona.totale.euro] as const].forEach(([nome, euro]) => {
+    r++
+    rp.getRow(r).values = [nome, ...quoteEuro(euro)]
+    for (let c = 2; c <= 5; c++) rp.getCell(r, c).numFmt = '0%'
+  })
+
+  r += 2
   rp.getCell(`A${r}`).value = 'Cernita aziende (si aggiorna con il foglio Clienti dealer)'
   rp.getCell(`A${r}`).font = { bold: true, color: { argb: BLU }, size: 12 }
   r++
@@ -263,7 +276,7 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
   }
 
   /* ---------- Comuni ---------- */
-  const colCo = ['Comune', 'Prov.', 'Distanza km', '% superficie nel raggio', 'Abitanti (quota)', 'Autovetture (quota)', 'Veicoli merci (quota)', 'Pesanti e rimorchi (quota)', 'Motocicli (quota)', 'Autobus (quota)', 'Unità locali (quota)', 'Addetti (quota)', 'UL 10-49', 'UL 50-249', 'UL 250+', 'Officine e gommisti', 'Abitanti comune intero', 'Autovetture comune intero']
+  const colCo = ['Comune', 'Prov.', 'Distanza km', '% superficie nel raggio', 'Abitanti (quota)', 'Autovetture (quota)', 'Veicoli merci (quota)', 'Pesanti e rimorchi (quota)', 'Motocicli (quota)', 'Autobus (quota)', 'Unità locali (quota)', 'Addetti (quota)', 'UL 10-49', 'UL 50-249', 'UL 250+', 'Officine e gommisti', 'Abitanti comune intero', 'Autovetture comune intero', ...GRUPPI_EURO.map((g) => `Auto ${g.nome} (${g.periodo})`)]
   intestazione(co, 1, colCo)
   co.getColumn(1).width = 26
   for (let c = 2; c <= colCo.length; c++) co.getColumn(c).width = 13
@@ -274,11 +287,13 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
       Math.round(t.autocarri), Math.round(t.pesanti), Math.round(t.motocicli), Math.round(t.autobus), Math.round(t.unitaLocali), Math.round(t.addetti),
       Math.round(t.ulClassi[1]), Math.round(t.ulClassi[2]), Math.round(t.ulClassi[3]), Math.round(t.officine),
       z.comune.pop ?? undefined, z.comune.veh?.autovetture ?? undefined,
+      ...quoteEuro(z.comune.veh?.euro),
     ]
   })
   co.getColumn(4).numFmt = '0%'
   co.getColumn(3).numFmt = '0.0'
   for (let c = 5; c <= colCo.length; c++) co.getColumn(c).numFmt = intero
+  for (let c = colCo.length - 3; c <= colCo.length; c++) co.getColumn(c).numFmt = '0%'
   co.getColumn(3).numFmt = '0.0'
   co.autoFilter = { from: 'A1', to: { row: zona.comuni.length + 1, column: colCo.length } }
 
@@ -295,6 +310,21 @@ export async function creaExcel(d: DatiExport): Promise<Blob> {
   })
   for (let c = 5; c <= colSe.length; c++) se.getColumn(c).numFmt = intero
   se.autoFilter = { from: 'A1', to: { row: zona.settori.length + 1, column: colSe.length } }
+
+  /* ---------- Concorrenza ---------- */
+  intestazione(cc, 1, ['Nome', 'Tipo', 'Rete', 'Gruppo', 'Distanza km', 'Indirizzo', 'Partita IVA', 'Fonte', 'Latitudine', 'Longitudine'])
+  ;[40, 12, 22, 14, 11, 36, 14, 16, 12, 12].forEach((w, i) => (cc.getColumn(i + 1).width = w))
+  zona.concorrenti.forEach((c, i) => {
+    cc.getRow(i + 2).values = [c.nome || '(senza nome)', c.gommista ? 'Gommista' : 'Officina', c.rete || 'Indipendente', c.gruppo, c.distanzaKm, c.indirizzo ?? '', c.piva ?? '', c.fonte === 'registro' ? 'Registro Imprese' : 'OpenStreetMap', c.lat, c.lon]
+    cc.getRow(i + 2).getCell(7).numFmt = '@'
+  })
+  cc.getColumn(5).numFmt = '0.0'
+  if (zona.concorrenti.length) cc.autoFilter = { from: 'A1', to: { row: zona.concorrenti.length + 1, column: 10 } }
+  cc.getCell(`A${zona.concorrenti.length + 3}`).value =
+    zona.infoConcorrenza?.registro
+      ? 'Fonti: Registro Imprese (ATECO 45.20.40) e © OpenStreetMap contributors (ODbL).'
+      : 'Fonte: © OpenStreetMap contributors (ODbL). Copertura parziale: il numero ISTAT delle officine resta il riferimento.'
+  cc.getCell(`A${zona.concorrenti.length + 3}`).font = { italic: true, color: { argb: GRIGIO } }
 
   wb.views = [{ x: 0, y: 0, width: 20000, height: 12000, firstSheet: 0, activeTab: 1, visibility: 'visible' }]
 

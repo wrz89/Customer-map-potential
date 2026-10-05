@@ -64,6 +64,8 @@ export interface Acquisto {
   centro: { lat: number; lon: number }
   filtri: { minDipendenti?: number; maxDipendenti?: number; ateco?: string[] }
   fonte: Azienda['fonte']
+  /** 'concorrenza' = gommisti concorrenti, esclusi dall'elenco clienti potenziali */
+  scopo?: 'clienti' | 'concorrenza'
   conteggio: number
   prezzo: number | null
   aziende: Azienda[]

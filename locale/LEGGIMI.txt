@@ -14,6 +14,15 @@ DATI
   Usa sempre lo stesso browser. Per spostarli su un altro PC: Impostazioni > Esporta.
 - Serve internet solo per la mappa stradale di sfondo, la ricerca indirizzi e Openapi.
 
+DATI REALI E COSTI (verificati il 5/10/2026, IVA esclusa salvo indicazione)
+- Comuni, veicoli, età del parco, settori: gratis, già dentro.
+- Concorrenza da OpenStreetMap: gratis, ma solo un gommista su dieci circa.
+- Openapi (aziende e gommisti ATECO 45.20.40): 0,10 euro + IVA con dettaglio completo.
+  La "Stima costo" nell'app è gratuita (100 al giorno) e mostra il prezzo esatto.
+- Telemaco, registroimprese.it > Elenchi di imprese: 5 euro + 0,02 euro a impresa
+  (solo indirizzi), esente IVA. Ideale per i gommisti di una provincia: si importa
+  in Territorio > Concorrenza.
+
 ACQUISTO NOMINATIVI
 - Apri impostazioni.txt con il Blocco note e incolla il token Openapi.
 - Prova prima con OPENAPI_SANDBOX=1, poi metti 0 per i dati veri.

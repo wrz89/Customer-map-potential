@@ -6,13 +6,14 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import { Crosshair, Layers, Map as MapIcon, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Azienda } from '../lib/companies'
+import { quotaVecchie } from '../lib/eta'
 import { n0, n1 } from '../lib/fmt'
 import type { EsitoMatch, StatoMatch } from '../lib/match'
 import { DEMO } from '../lib/ambiente'
 import { geocodifica, type Dealer } from '../lib/store'
 import type { Zona } from '../lib/zone'
 
-export type Metrica = 'autovetture' | 'veicoliMerci' | 'addetti' | 'pop' | 'officine'
+export type Metrica = 'autovetture' | 'veicoliMerci' | 'addetti' | 'pop' | 'officine' | 'eta'
 
 export const METRICHE: Record<Metrica, { nome: string; unita: string; valore: (z: Zona['comuni'][number]) => number }> = {
   autovetture: { nome: 'Autovetture per km²', unita: 'auto/km²', valore: (z) => (z.comune.veh?.autovetture ?? 0) / Math.max(z.comune.km2, 0.1) },
@@ -20,6 +21,7 @@ export const METRICHE: Record<Metrica, { nome: string; unita: string; valore: (z
   addetti: { nome: 'Addetti per km²', unita: 'addetti/km²', valore: (z) => (z.ul?.['0010']?.[1] ?? 0) / Math.max(z.comune.km2, 0.1) },
   pop: { nome: 'Abitanti per km²', unita: 'ab./km²', valore: (z) => (z.comune.pop ?? 0) / Math.max(z.comune.km2, 0.1) },
   officine: { nome: 'Autovetture per officina', unita: 'auto per officina', valore: (z) => (z.comune.off ? (z.comune.veh?.autovetture ?? 0) / z.comune.off : 0) },
+  eta: { nome: 'Auto vecchie: Euro 0-3, prima del 2006', unita: '% del parco', valore: (z) => quotaVecchie(z.comune.veh?.euro) * 100 },
 }
 
 // in sviluppo MapLibre trova il worker da solo; in produzione serve l'indirizzo del file impacchettato
@@ -35,10 +37,12 @@ const STATO_COLORE: Record<StatoMatch, string> = {
   Nuovo: '#0ca30c',
 }
 
-type Livello = 'comuni' | 'anelli' | 'aziende' | 'dealer'
+type Livello = 'comuni' | 'anelli' | 'concorrenza' | 'officine' | 'aziende' | 'dealer'
 const LIVELLI: { id: Livello; nome: string; layer: string[] }[] = [
   { id: 'comuni', nome: 'Comuni', layer: ['comuni-fill', 'comuni-line'] },
   { id: 'anelli', nome: 'Anelli di distanza', layer: ['anelli-line', 'anelli-label'] },
+  { id: 'concorrenza', nome: 'Gommisti concorrenti', layer: ['conc-gomm'] },
+  { id: 'officine', nome: 'Altre officine', layer: ['conc-off'] },
   { id: 'aziende', nome: 'Aziende', layer: ['aziende-pt'] },
   { id: 'dealer', nome: 'Altri SuperService', layer: ['dealer-halo', 'dealer-pt', 'dealer-label'] },
 ]
@@ -70,7 +74,7 @@ function aggiungiLivelli(map: MLMap, scuro: boolean) {
   const vuota = { type: 'FeatureCollection', features: [] } as GeoJSON.FeatureCollection
   // etichette in sorgenti separate: se i font della mappa di base non arrivano,
   // spariscono solo le scritte, non i cerchi e i punti
-  for (const id of ['comuni', 'anelli', 'aziende', 'dealer', 'anelli-testo', 'dealer-testo']) {
+  for (const id of ['comuni', 'anelli', 'concorrenza', 'aziende', 'dealer', 'anelli-testo', 'dealer-testo']) {
     map.addSource(id, { type: 'geojson', data: vuota })
   }
   const seq = SEQ.map(css)
@@ -107,6 +111,26 @@ function aggiungiLivelli(map: MLMap, scuro: boolean) {
     source: 'anelli-testo',
     layout: { 'symbol-placement': 'line', 'text-field': ['get', 'label'], 'text-size': 11, 'text-font': ['Noto Sans Bold'] },
     paint: { 'text-color': inchiostro, 'text-halo-color': alone, 'text-halo-width': 1.6 },
+  })
+  // concorrenza: officine generiche piccole e vuote, gommisti pieni (catene in viola)
+  map.addLayer({
+    id: 'conc-off',
+    type: 'circle',
+    source: 'concorrenza',
+    filter: ['==', ['get', 'g'], 0],
+    paint: { 'circle-radius': 3.5, 'circle-color': scuro ? '#131a26' : '#ffffff', 'circle-stroke-color': css('--ink-2'), 'circle-stroke-width': 1.2 },
+  })
+  map.addLayer({
+    id: 'conc-gomm',
+    type: 'circle',
+    source: 'concorrenza',
+    filter: ['==', ['get', 'g'], 1],
+    paint: {
+      'circle-radius': ['case', ['==', ['get', 'rete'], ''], 5, 6],
+      'circle-color': ['get', 'colore'],
+      'circle-stroke-color': scuro ? '#0b0f17' : '#ffffff',
+      'circle-stroke-width': 1.5,
+    },
   })
   map.addLayer({
     id: 'aziende-pt',
@@ -176,7 +200,7 @@ export default function MapView(props: Props) {
   const mapRef = useRef<MLMap | null>(null)
   const markerRef = useRef<maplibregl.Marker | null>(null)
   const [pronta, setPronta] = useState(0)
-  const [livelli, setLivelli] = useState<Record<Livello, boolean>>({ comuni: true, anelli: true, aziende: true, dealer: true })
+  const [livelli, setLivelli] = useState<Record<Livello, boolean>>({ comuni: true, anelli: true, concorrenza: true, officine: false, aziende: true, dealer: true })
   const [esplora, setEsplora] = useState(false)
   const [coloraPer, setColoraPer] = useState<'flotta' | 'stato'>('flotta')
   const [flotte, setFlotte] = useState<Record<string, boolean>>({ Alta: true, Media: true, Bassa: true, 'n.d.': true })
@@ -226,6 +250,7 @@ export default function MapView(props: Props) {
           ul: tot?.[0] ?? 0,
           ul50: (tot?.[6] ?? 0) + (tot?.[8] ?? 0),
           off: z.comune.off ?? 0,
+          vecchie: quotaVecchie(z.comune.veh?.euro),
           dist: z.distanzaKm,
         },
       }
@@ -270,6 +295,25 @@ export default function MapView(props: Props) {
     return { aziendeFC: { type: 'FeatureCollection', features } as GeoJSON.FeatureCollection, visibiliAziende: features.length }
     // css() dipende dal tema: si ricalcola anche quando cambia
   }, [aziende, esiti, flotte, stati, minDip, coloreStato, tema]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const concorrenzaFC = useMemo(() => {
+    const catena = tema === 'dark' ? '#9085e9' : '#4a3aa7'
+    return {
+      type: 'FeatureCollection',
+      features: (zona?.concorrenti ?? []).map((c) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [c.lon, c.lat] },
+        properties: {
+          g: c.gommista ? 1 : 0,
+          rete: c.rete,
+          gruppo: c.gruppo,
+          nome: c.nome,
+          dist: c.distanzaKm,
+          colore: c.rete === 'SuperService' ? '#f5b301' : c.rete ? catena : css('--ink-2'),
+        },
+      })),
+    } as GeoJSON.FeatureCollection
+  }, [zona, tema]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const dealerFC = useMemo(
     () =>
@@ -334,7 +378,7 @@ export default function MapView(props: Props) {
     scheda.on('close', togliScelte)
 
     const sopraPunto = (p: maplibregl.PointLike) =>
-      map.queryRenderedFeatures(p, { layers: ['aziende-pt', 'dealer-pt'].filter((l) => map.getLayer(l)) }).length > 0
+      map.queryRenderedFeatures(p, { layers: ['aziende-pt', 'dealer-pt', 'conc-gomm', 'conc-off'].filter((l) => map.getLayer(l)) }).length > 0
 
     map.on('mousemove', 'comuni-fill', (e) => {
       const f = e.features?.[0]
@@ -357,7 +401,7 @@ export default function MapView(props: Props) {
       map.getCanvas().style.cursor = esploraRef.current ? 'crosshair' : ''
       suggerimento.remove()
     })
-    for (const l of ['aziende-pt', 'dealer-pt']) {
+    for (const l of ['aziende-pt', 'dealer-pt', 'conc-gomm', 'conc-off']) {
       map.on('mouseenter', l, () => !esploraRef.current && (map.getCanvas().style.cursor = 'pointer'))
       map.on('mouseleave', l, () => (map.getCanvas().style.cursor = esploraRef.current ? 'crosshair' : ''))
     }
@@ -371,7 +415,7 @@ export default function MapView(props: Props) {
         setEsplora(false)
         return
       }
-      const layers = ['dealer-pt', 'aziende-pt', 'comuni-fill'].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, 'visibility') !== 'none')
+      const layers = ['dealer-pt', 'aziende-pt', 'conc-gomm', 'conc-off', 'comuni-fill'].filter((l) => map.getLayer(l) && map.getLayoutProperty(l, 'visibility') !== 'none')
       const f: MapGeoJSONFeature | undefined = map.queryRenderedFeatures(e.point, { layers })[0]
       togliScelte()
       suggerimento.remove()
@@ -386,6 +430,18 @@ export default function MapView(props: Props) {
           .setHTML(
             `<div class="cmp-card"><div class="t">${esc(p.nome)}</div><div class="s">SuperService della rete</div>
             <div class="row"><button class="cmp-btn" data-azione="dealer" data-id="${esc(p.id)}">Analizza questo dealer</button></div></div>`,
+          )
+          .addTo(map)
+      } else if (f.layer.id === 'conc-gomm' || f.layer.id === 'conc-off') {
+        const tipo = Number(p.g) ? 'Gommista' : 'Officina'
+        const rete = p.rete ? `${esc(p.rete)}${p.gruppo ? ` · gruppo ${esc(p.gruppo)}` : ''}` : 'Indipendente o rete non indicata'
+        scheda
+          .setLngLat(e.lngLat)
+          .setHTML(
+            `<div class="cmp-card"><div class="t">${esc(p.nome || `${tipo} senza nome`)}</div>
+            <div class="s">${tipo} · ${rete}</div>
+            <table><tr><td>Distanza dal centro</td><td>${n1(Number(p.dist))} km</td></tr></table>
+            <div class="m">La rete si ricava dal nome dell'attività.</div></div>`,
           )
           .addTo(map)
       } else if (f.layer.id === 'aziende-pt') {
@@ -424,6 +480,7 @@ export default function MapView(props: Props) {
               <tr><td>Abitanti</td><td>${n0(Number(p.pop))}</td></tr>
               <tr><td>Autovetture</td><td>${n0(Number(p.auto))}</td></tr>
               <tr><td>Veicoli merci e pesanti</td><td>${n0(Number(p.merci))}</td></tr>
+              <tr><td>Auto Euro 0-3, prima del 2006</td><td>${Math.round(Number(p.vecchie) * 100)}%</td></tr>
               <tr><td>Unità locali</td><td>${n0(Number(p.ul))}</td></tr>
               <tr><td>Addetti</td><td>${n0(Number(p.addetti))}</td></tr>
               <tr><td>Sedi con 50+ addetti</td><td>${n0(Number(p.ul50))}</td></tr>
@@ -475,9 +532,10 @@ export default function MapView(props: Props) {
     set('anelli', anelliFC)
     set('anelli-testo', anelliFC)
     set('aziende', aziendeFC)
+    set('concorrenza', concorrenzaFC)
     set('dealer', dealerFC)
     set('dealer-testo', dealerFC)
-  }, [pronta, comuniFC, anelliFC, aziendeFC, dealerFC])
+  }, [pronta, comuniFC, anelliFC, aziendeFC, concorrenzaFC, dealerFC])
 
   useEffect(() => {
     const map = mapRef.current
@@ -617,6 +675,31 @@ export default function MapView(props: Props) {
                 <div className="num mt-1 flex justify-between text-[10px]" style={{ color: 'var(--muted)' }}>
                   <span>basso</span>
                   <span>alto</span>
+                </div>
+              </div>
+            )}
+
+            {(livelli.concorrenza || livelli.officine) && zona && (
+              <div className="mt-3 border-t pt-2" style={{ borderColor: 'var(--line)' }}>
+                <div className="mb-1.5 font-semibold">Concorrenza mappata</div>
+                {[
+                  { nome: 'Gommisti indipendenti', colore: 'var(--ink-2)', n: zona.concorrenti.filter((c) => c.gommista && !c.rete).length, vuoto: false },
+                  { nome: 'Catene e reti', colore: tema === 'dark' ? '#9085e9' : '#4a3aa7', n: zona.concorrenti.filter((c) => c.gommista && c.rete && c.rete !== 'SuperService').length, vuoto: false },
+                  { nome: 'SuperService in OpenStreetMap', colore: '#f5b301', n: zona.concorrenti.filter((c) => c.rete === 'SuperService').length, vuoto: false },
+                  { nome: 'Altre officine', colore: 'var(--ink-2)', n: zona.concorrenti.filter((c) => !c.gommista).length, vuoto: true },
+                ].map((r) => (
+                  <div key={r.nome} className="flex items-center gap-2 py-0.5">
+                    <span className="inline-block h-2.5 w-2.5 rounded-full" style={r.vuoto ? { border: `1.5px solid ${r.colore}` } : { background: r.colore }} />
+                    <span className="flex-1">{r.nome}</span>
+                    <span className="num" style={{ color: 'var(--muted)' }}>{n0(r.n)}</span>
+                  </div>
+                ))}
+                <div className="mt-1" style={{ color: 'var(--muted)' }}>
+                  {zona.infoConcorrenza?.registro
+                    ? 'Fonti: Registro Imprese e OpenStreetMap.'
+                    : zona.infoConcorrenza?.stato === 'carico'
+                      ? 'Carico OpenStreetMap…'
+                      : 'Solo OpenStreetMap: parziale. Elenco completo in Territorio.'}
                 </div>
               </div>
             )}
