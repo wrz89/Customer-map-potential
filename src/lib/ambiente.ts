@@ -41,4 +41,5 @@ interface DesktopApi {
 }
 
 /** Presente solo dentro l'applicazione per PC. */
-export const desktop: DesktopApi | undefined = (window as unknown as { cmpDesktop?: DesktopApi }).cmpDesktop
+export const desktop: DesktopApi | undefined =
+  typeof window === 'undefined' ? undefined : (window as unknown as { cmpDesktop?: DesktopApi }).cmpDesktop
